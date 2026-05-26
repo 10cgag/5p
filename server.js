@@ -1,7 +1,6 @@
 const { WebSocketServer } = require('ws');
 const http = require('http');
 
-// إنشاء سيرفر HTTP عادي لكي يقبله الموقع
 const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end('Screen Stream Server is Running!\n');
