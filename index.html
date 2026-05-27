@@ -3,34 +3,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>بث وتحكم</title>
+    <title>بث مباشر</title>
     <style>
-        /* تم تغيير الخلفية إلى الأبيض */
-        body { margin: 0; background: #fff; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
-        
-        /* تم تغيير object-fit إلى cover لملء كامل الشاشة وإخفاء الفراغات */
-        #screenDisplay { flex-grow: 1; width: 100vw; object-fit: cover; cursor: crosshair; }
-        
-        .controls { height: 10vh; display: flex; justify-content: space-around; align-items: center; background: #333; }
-        button { padding: 10px; color: white; background: #555; border: none; border-radius: 5px; cursor: pointer; }
+        body { 
+            margin: 0; 
+            padding: 0; 
+            background-color: #ffffff; /* الخلفية البيضاء */
+            width: 100vw; 
+            height: 100vh; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            overflow: hidden; 
+        }
+        #screenDisplay { 
+            width: 100%; 
+            height: 100%; 
+            /* هذا هو التغيير الحاسم: سيمدد الصورة لتملأ كل شيء */
+            object-fit: fill; 
+            cursor: crosshair; 
+        }
     </style>
 </head>
 <body>
     <img id="screenDisplay" />
-    <div class="controls">
-        <button onclick="setFit('fill')">ملء الشاشة</button>
-        <button onclick="setFit('contain')">إظهار الكل</button>
-    </div>
     <script>
         const ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`);
         const img = document.getElementById('screenDisplay');
         
-        function setFit(mode) { img.style.objectFit = mode; }
-
-        ws.onmessage = (event) => {
-            const blob = new Blob([event.data], { type: 'image/jpeg' });
-            if (img.src) URL.revokeObjectURL(img.src);
-            img.src = URL.createObjectURL(blob);
+        ws.onmessage = async (e) => {
+            if (e.data instanceof Blob || e.data instanceof ArrayBuffer) {
+                const blob = new Blob([e.data], { type: 'image/jpeg' });
+                const url = URL.createObjectURL(blob);
+                img.onload = () => URL.revokeObjectURL(url);
+                img.src = url;
+            }
         };
 
         img.addEventListener('click', (e) => {
