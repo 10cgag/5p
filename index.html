@@ -5,32 +5,39 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>بث مباشر</title>
     <style>
-        body { margin: 0; padding: 0; background: #fff; height: 100vh; width: 100vw; display: flex; justify-content: center; align-items: center; overflow: hidden; }
-        #screenDisplay { width: 100%; height: 100%; object-fit: contain; cursor: crosshair; }
-        #status { position: absolute; color: red; font-family: sans-serif; }
+        body { 
+            margin: 0; 
+            padding: 0; 
+            background: #fff; /* خلفية بيضاء */
+            height: 100vh; 
+            width: 100vw; 
+            overflow: hidden; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+        }
+        #screenDisplay { 
+            width: 100vw; 
+            height: 100vh; 
+            object-fit: contain; /* احتواء الصورة مع الحفاظ على نسبها */
+            cursor: crosshair; 
+        }
     </style>
 </head>
 <body>
-    <div id="status">جاري الاتصال...</div>
     <img id="screenDisplay" />
     <script>
         const ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`);
         const img = document.getElementById('screenDisplay');
-        const status = document.getElementById('status');
-        
-        ws.onopen = () => status.innerText = "متصل - بانتظار الصورة";
-        ws.onclose = () => status.innerText = "تم قطع الاتصال";
         
         ws.onmessage = async (event) => {
-            if (typeof event.data === 'string') return; // تجاهل الرسائل النصية
-            
-            status.style.display = "none"; // إخفاء كلمة "جاري الاتصال" عند وصول أول صورة
+            // استقبال الصورة وعرضها فوراً
             const blob = new Blob([event.data], { type: 'image/jpeg' });
-            
-            // تحديث الصورة
+            if (img.src) URL.revokeObjectURL(img.src);
             img.src = URL.createObjectURL(blob);
         };
 
+        // إرسال اللمسات للسيرفر
         img.addEventListener('click', (e) => {
             const rect = img.getBoundingClientRect();
             ws.send(JSON.stringify({ 
