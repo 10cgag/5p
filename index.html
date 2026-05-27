@@ -3,41 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>بث مباشر</title>
+    <title>تحكم دقيق بالحجم</title>
     <style>
-        body { margin: 0; padding: 0; background: #fff; height: 100vh; width: 100vw; display: flex; justify-content: center; align-items: center; overflow: hidden; }
-        #screenDisplay { width: 100%; height: 100%; object-fit: contain; cursor: crosshair; }
-        #status { position: absolute; color: red; font-family: sans-serif; }
+        body { margin: 0; background: #000; display: flex; flex-direction: column; height: 100vh; }
+        #screenDisplay { width: 100vw; height: 80vh; object-fit: contain; cursor: crosshair; transition: 0.3s; }
+        .controls { height: 20vh; background: #222; color: white; padding: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        input { width: 60px; }
     </style>
 </head>
 <body>
-    <div id="status">جاري الاتصال...</div>
     <img id="screenDisplay" />
+    <div class="controls">
+        <div>العرض: <input type="number" id="widthVal" value="100" oninput="updateSize()"> %</div>
+        <div>الطول: <input type="number" id="heightVal" value="80" oninput="updateSize()"> %</div>
+        <button onclick="setFit('fill')">ملء الشاشة</button>
+        <button onclick="setFit('contain')">احتواء</button>
+    </div>
     <script>
         const ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`);
         const img = document.getElementById('screenDisplay');
-        const status = document.getElementById('status');
         
-        ws.onopen = () => status.innerText = "متصل - بانتظار الصورة";
-        ws.onclose = () => status.innerText = "تم قطع الاتصال";
-        
-        ws.onmessage = async (event) => {
-            if (typeof event.data === 'string') return; // تجاهل الرسائل النصية
-            
-            status.style.display = "none"; // إخفاء كلمة "جاري الاتصال" عند وصول أول صورة
-            const blob = new Blob([event.data], { type: 'image/jpeg' });
-            
-            // تحديث الصورة
-            img.src = URL.createObjectURL(blob);
+        function updateSize() {
+            img.style.width = document.getElementById('widthVal').value + "%";
+            img.style.height = document.getElementById('heightVal').value + "%";
+        }
+        function setFit(mode) { img.style.objectFit = mode; }
+
+        ws.onmessage = (event) => {
+            if (typeof event.data === 'string') return;
+            img.src = URL.createObjectURL(new Blob([event.data], { type: 'image/jpeg' }));
         };
 
         img.addEventListener('click', (e) => {
             const rect = img.getBoundingClientRect();
-            ws.send(JSON.stringify({ 
-                type: 'touch', 
-                x: (e.clientX - rect.left) / rect.width, 
-                y: (e.clientY - rect.top) / rect.height 
-            }));
+            ws.send(JSON.stringify({ type: 'touch', x: (e.clientX - rect.left) / rect.width, y: (e.clientY - rect.top) / rect.height }));
         });
     </script>
 </body>
