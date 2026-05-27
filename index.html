@@ -2,30 +2,38 @@
 <html lang="ar">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>بث الشاشة المباشر</title>
+    <title>بث وتحكم مباشر</title>
     <style>
-        body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
-        img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        img { max-width: 100%; max-height: 100%; cursor: crosshair; }
     </style>
 </head>
 <body>
-    <img id="screenDisplay" src="" alt="بانتظار بدء البث من الهاتف..." />
-
+    <img id="screenDisplay" />
     <script>
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const ws = new WebSocket(`${protocol}//${window.location.host}`);
+        const ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`);
         const img = document.getElementById('screenDisplay');
-
+        
         ws.onmessage = (event) => {
             if (typeof event.data === 'string') {
-                img.src = event.data.startsWith('data:image') ? event.data : 'data:image/jpeg;base64,' + event.data;
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'image') img.src = data.payload;
+                } catch {
+                    img.src = event.data;
+                }
             } else {
-                const blob = new Blob([event.data], { type: 'image/jpeg' });
-                img.src = URL.createObjectURL(blob);
+                img.src = URL.createObjectURL(new Blob([event.data], { type: 'image/jpeg' }));
             }
         };
-        ws.onclose = () => { console.log('تم قطع الاتصال بالسيرفر'); };
+
+        // إرسال اللمسة للسيرفر
+        img.addEventListener('click', (e) => {
+            const rect = img.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / rect.width;
+            const y = (e.clientY - rect.top) / rect.height;
+            ws.send(JSON.stringify({ type: 'touch', x, y }));
+        });
     </script>
 </body>
 </html>
