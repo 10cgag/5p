@@ -1,44 +1,25 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html>
 <head>
-    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>تحكم دقيق بالحجم</title>
     <style>
-        /* تغيير الخلفية إلى الأبيض هنا */
-        body { margin: 0; background: #fff; display: flex; flex-direction: column; height: 100vh; }
-        #screenDisplay { width: 100vw; height: 80vh; object-fit: contain; cursor: crosshair; transition: 0.3s; }
-        .controls { height: 20vh; background: #222; color: white; padding: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        input { width: 60px; }
-        button { padding: 5px; cursor: pointer; }
+        body { margin: 0; background: #fff; overflow: hidden; }
+        #screenDisplay { width: 100vw; height: 100vh; object-fit: contain; }
     </style>
 </head>
 <body>
     <img id="screenDisplay" />
-    <div class="controls">
-        <div>العرض: <input type="number" id="widthVal" value="100" oninput="updateSize()"> %</div>
-        <div>الطول: <input type="number" id="heightVal" value="80" oninput="updateSize()"> %</div>
-        <button onclick="setFit('fill')">ملء الشاشة</button>
-        <button onclick="setFit('contain')">احتواء</button>
-    </div>
     <script>
         const ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`);
         const img = document.getElementById('screenDisplay');
-        
-        function updateSize() {
-            img.style.width = document.getElementById('widthVal').value + "%";
-            img.style.height = document.getElementById('heightVal').value + "%";
-        }
-        function setFit(mode) { img.style.objectFit = mode; }
-
-        ws.onmessage = (event) => {
-            if (typeof event.data === 'string') return;
-            img.src = URL.createObjectURL(new Blob([event.data], { type: 'image/jpeg' }));
+        ws.onmessage = async (e) => {
+            if (typeof e.data !== 'string') {
+                img.src = URL.createObjectURL(new Blob([e.data], { type: 'image/jpeg' }));
+            }
         };
-
         img.addEventListener('click', (e) => {
-            const rect = img.getBoundingClientRect();
-            ws.send(JSON.stringify({ type: 'touch', x: (e.clientX - rect.left) / rect.width, y: (e.clientY - rect.top) / rect.height }));
+            const r = img.getBoundingClientRect();
+            ws.send(JSON.stringify({ type: 'touch', x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height }));
         });
     </script>
 </body>
