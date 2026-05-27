@@ -1,10 +1,26 @@
 <!DOCTYPE html>
-<html>
+<html lang="ar">
 <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>بث مباشر</title>
     <style>
-        body { margin: 0; padding: 0; background-color: #ffffff; width: 100vw; height: 100vh; overflow: hidden; display: flex; align-items: center; justify-content: center; }
-        #screenDisplay { max-width: 100vw; max-height: 100vh; object-fit: contain; cursor: crosshair; }
+        body { 
+            margin: 0; 
+            padding: 0; 
+            background-color: #ffffff; 
+            width: 100vw; 
+            height: 100vh; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            overflow: hidden; 
+        }
+        #screenDisplay { 
+            width: 100vw; 
+            height: 100vh; 
+            object-fit: contain; 
+        }
     </style>
 </head>
 <body>
@@ -14,12 +30,9 @@
         const img = document.getElementById('screenDisplay');
         
         ws.onmessage = async (e) => {
-            if (e.data instanceof Blob || e.data instanceof ArrayBuffer) {
-                const blob = new Blob([e.data], { type: 'image/jpeg' });
-                const url = URL.createObjectURL(blob);
-                img.onload = () => URL.revokeObjectURL(url); // مسح الذاكرة بعد التحميل
-                img.src = url;
-            }
+            const blob = new Blob([e.data], { type: 'image/jpeg' });
+            if (img.src) URL.revokeObjectURL(img.src);
+            img.src = URL.createObjectURL(blob);
         };
 
         img.addEventListener('click', (e) => {
