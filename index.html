@@ -1,10 +1,27 @@
 <!DOCTYPE html>
-<html>
+<html lang="ar">
 <head>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>بث مباشر</title>
     <style>
-        body { margin: 0; background: #fff; overflow: hidden; }
-        #screenDisplay { width: 100vw; height: 100vh; object-fit: contain; }
+        body { 
+            margin: 0; 
+            padding: 0; 
+            background: #fff; /* خلفية بيضاء */
+            height: 100vh; 
+            width: 100vw; 
+            overflow: hidden; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+        }
+        #screenDisplay { 
+            width: 100vw; 
+            height: 100vh; 
+            object-fit: contain; /* احتواء الصورة مع الحفاظ على نسبها */
+            cursor: crosshair; 
+        }
     </style>
 </head>
 <body>
@@ -12,14 +29,22 @@
     <script>
         const ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`);
         const img = document.getElementById('screenDisplay');
-        ws.onmessage = async (e) => {
-            if (typeof e.data !== 'string') {
-                img.src = URL.createObjectURL(new Blob([e.data], { type: 'image/jpeg' }));
-            }
+        
+        ws.onmessage = async (event) => {
+            // استقبال الصورة وعرضها فوراً
+            const blob = new Blob([event.data], { type: 'image/jpeg' });
+            if (img.src) URL.revokeObjectURL(img.src);
+            img.src = URL.createObjectURL(blob);
         };
+
+        // إرسال اللمسات للسيرفر
         img.addEventListener('click', (e) => {
-            const r = img.getBoundingClientRect();
-            ws.send(JSON.stringify({ type: 'touch', x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height }));
+            const rect = img.getBoundingClientRect();
+            ws.send(JSON.stringify({ 
+                type: 'touch', 
+                x: (e.clientX - rect.left) / rect.width, 
+                y: (e.clientY - rect.top) / rect.height 
+            }));
         });
     </script>
 </body>
