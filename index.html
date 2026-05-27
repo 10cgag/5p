@@ -5,38 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>بث وتحكم</title>
     <style>
-        /* تم ضبط الخلفية لتكون بيضاء تماماً */
-        body { 
-            margin: 0; 
-            background: #ffffff !important; 
-            height: 100vh; 
-            overflow: hidden; 
-            display: flex; 
-            flex-direction: column; 
-        }
-        
-        #screenDisplay { 
-            flex-grow: 1; 
-            width: 100vw; 
-            object-fit: contain; 
-            cursor: crosshair; 
-        }
-        
-        .controls { 
-            height: 10vh; 
-            display: flex; 
-            justify-content: space-around; 
-            align-items: center; 
-            background: #f0f0f0; /* خلفية الأزرار رمادي فاتح */
-        }
-        button { 
-            padding: 10px; 
-            color: #000; 
-            background: #ddd; 
-            border: 1px solid #999; 
-            border-radius: 5px; 
-            cursor: pointer; 
-        }
+        body { margin: 0; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+        #screenDisplay { flex-grow: 1; width: 100vw; object-fit: contain; cursor: crosshair; }
+        .controls { height: 10vh; display: flex; justify-content: space-around; align-items: center; background: #333; }
+        button { padding: 10px; color: white; background: #555; border: none; border-radius: 5px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -46,6 +18,9 @@
         <button onclick="setFit('contain')">إظهار الكل</button>
     </div>
     <script>
+        // إجبار الخلفية على أن تكون بيضاء برمجياً (تجاوز أي كاش)
+        document.body.style.backgroundColor = "#ffffff";
+        
         const ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`);
         const img = document.getElementById('screenDisplay');
         
