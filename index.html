@@ -3,49 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>بث وتحكم مباشر</title>
+    <title>بث وتحكم</title>
     <style>
-        body { 
-            margin: 0; 
-            padding: 0; 
-            background: #000; 
-            display: flex; 
-            justify-content: center; 
-            align-items: center; 
-            height: 100vh; 
-            width: 100vw; 
-            overflow: hidden; 
-        }
-        #screenDisplay { 
-            width: 100vw; 
-            height: 100vh; 
-            object-fit: contain; 
-            cursor: crosshair; 
-        }
+        body { margin: 0; background: #000; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+        #screenDisplay { width: 100vw; height: 90vh; cursor: crosshair; }
+        .controls { height: 10vh; display: flex; justify-content: space-around; align-items: center; background: #333; }
+        button { padding: 10px; color: white; background: #555; border: none; border-radius: 5px; }
     </style>
 </head>
 <body>
     <img id="screenDisplay" />
+    <div class="controls">
+        <button onclick="setFit('fill')">ملء الشاشة</button>
+        <button onclick="setFit('contain')">إظهار الكل</button>
+    </div>
     <script>
         const ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`);
         const img = document.getElementById('screenDisplay');
         
+        function setFit(mode) { img.style.objectFit = mode; }
+
         ws.onmessage = async (event) => {
-            // تجاهل أي رسائل نصية (مثل إحداثيات اللمس) وعرض الصور فقط
             if (typeof event.data === 'string') return;
-            
-            // عرض بيانات الصورة الخام
-            const blob = new Blob([event.data], { type: 'image/jpeg' });
-            img.src = URL.createObjectURL(blob);
+            img.src = URL.createObjectURL(new Blob([event.data], { type: 'image/jpeg' }));
         };
 
-        // إرسال إحداثيات اللمس إلى السيرفر
         img.addEventListener('click', (e) => {
             const rect = img.getBoundingClientRect();
-            // حساب الإحداثيات بالنسبة للصورة المعروضة
-            const x = (e.clientX - rect.left) / rect.width;
-            const y = (e.clientY - rect.top) / rect.height;
-            ws.send(JSON.stringify({ type: 'touch', x, y }));
+            ws.send(JSON.stringify({ type: 'touch', x: (e.clientX - rect.left) / rect.width, y: (e.clientY - rect.top) / rect.height }));
         });
     </script>
 </body>
