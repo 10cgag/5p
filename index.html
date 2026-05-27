@@ -5,10 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>بث وتحكم</title>
     <style>
-        body { margin: 0; background: #000; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+        /* تم تغيير الخلفية هنا من #000 إلى #fff */
+        body { margin: 0; background: #fff; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+        
         #screenDisplay { flex-grow: 1; width: 100vw; object-fit: contain; cursor: crosshair; }
+        
         .controls { height: 10vh; display: flex; justify-content: space-around; align-items: center; background: #333; }
-        button { padding: 10px; color: white; background: #555; border: none; border-radius: 5px; }
+        button { padding: 10px; color: white; background: #555; border: none; border-radius: 5px; cursor: pointer; }
     </style>
 </head>
 <body>
