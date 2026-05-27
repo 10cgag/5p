@@ -3,30 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>بث وتحكم</title>
+    <title>بث مباشر</title>
     <style>
-        body { margin: 0; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
-        #screenDisplay { flex-grow: 1; width: 100vw; object-fit: contain; cursor: crosshair; }
-        .controls { height: 10vh; display: flex; justify-content: space-around; align-items: center; background: #333; }
-        button { padding: 10px; color: white; background: #555; border: none; border-radius: 5px; cursor: pointer; }
+        /* إجبار الخلفية على أن تكون بيضاء ومنع أي وضع داكن */
+        html, body { 
+            margin: 0; 
+            padding: 0; 
+            background-color: #ffffff !important; 
+            width: 100vw; 
+            height: 100vh; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            overflow: hidden; 
+        }
+        #screenDisplay { 
+            width: 100vw; 
+            height: 100vh; 
+            object-fit: contain; 
+            cursor: crosshair; 
+        }
     </style>
 </head>
 <body>
     <img id="screenDisplay" />
-    <div class="controls">
-        <button onclick="setFit('fill')">ملء الشاشة</button>
-        <button onclick="setFit('contain')">إظهار الكل</button>
-    </div>
     <script>
-        // إجبار الخلفية على أن تكون بيضاء برمجياً (تجاوز أي كاش)
-        document.body.style.backgroundColor = "#ffffff";
-        
         const ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`);
         const img = document.getElementById('screenDisplay');
         
-        function setFit(mode) { img.style.objectFit = mode; }
-
         ws.onmessage = (event) => {
+            if (typeof event.data === 'string') return;
             const blob = new Blob([event.data], { type: 'image/jpeg' });
             if (img.src) URL.revokeObjectURL(img.src);
             img.src = URL.createObjectURL(blob);
