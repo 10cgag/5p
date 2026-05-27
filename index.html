@@ -3,41 +3,56 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>بث مباشر</title>
+    <title>بث وتحكم</title>
     <style>
         body { 
             margin: 0; 
-            padding: 0; 
-            background-color: #ffffff; /* الخلفية البيضاء */
-            width: 100vw; 
+            background: #fff; /* خلفية بيضاء */
             height: 100vh; 
             display: flex; 
-            justify-content: center; 
-            align-items: center; 
+            flex-direction: column; 
             overflow: hidden; 
         }
         #screenDisplay { 
-            width: 100%; 
-            height: 100%; 
-            /* هذا هو التغيير الحاسم: سيمدد الصورة لتملأ كل شيء */
-            object-fit: fill; 
+            flex-grow: 1; 
+            width: 100vw; 
+            object-fit: contain; /* احتواء الصورة */
             cursor: crosshair; 
+        }
+        .controls { 
+            height: 12vh; 
+            display: flex; 
+            justify-content: space-around; 
+            align-items: center; 
+            background: #f0f0f0; /* رمادي فاتح للأزرار */
+            border-top: 1px solid #ccc;
+        }
+        button { 
+            padding: 10px 20px; 
+            background: #444; 
+            color: white; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer; 
         }
     </style>
 </head>
 <body>
     <img id="screenDisplay" />
+    <div class="controls">
+        <button onclick="setFit('fill')">ملء الشاشة</button>
+        <button onclick="setFit('contain')">إظهار الكل</button>
+    </div>
     <script>
         const ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`);
         const img = document.getElementById('screenDisplay');
         
-        ws.onmessage = async (e) => {
-            if (e.data instanceof Blob || e.data instanceof ArrayBuffer) {
-                const blob = new Blob([e.data], { type: 'image/jpeg' });
-                const url = URL.createObjectURL(blob);
-                img.onload = () => URL.revokeObjectURL(url);
-                img.src = url;
-            }
+        function setFit(mode) { img.style.objectFit = mode; }
+
+        ws.onmessage = (event) => {
+            const blob = new Blob([event.data], { type: 'image/jpeg' });
+            if (img.src) URL.revokeObjectURL(img.src);
+            img.src = URL.createObjectURL(blob);
         };
 
         img.addEventListener('click', (e) => {
