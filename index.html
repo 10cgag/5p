@@ -2,24 +2,26 @@
 <html lang="ar">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>بث مباشر</title>
     <style>
-        body { 
+        /* إجبار الصفحة على أن تكون بيضاء بالكامل ومنع أي مسافات */
+        html, body { 
             margin: 0; 
             padding: 0; 
-            background-color: #ffffff; 
+            background-color: #ffffff !important; 
             width: 100vw; 
             height: 100vh; 
+            overflow: hidden; 
             display: flex; 
             justify-content: center; 
             align-items: center; 
-            overflow: hidden; 
         }
         #screenDisplay { 
             width: 100vw; 
             height: 100vh; 
-            object-fit: contain; 
+            object-fit: contain; /* عرض الصورة بالكامل دون قص */
+            background-color: #ffffff; 
         }
     </style>
 </head>
@@ -30,9 +32,12 @@
         const img = document.getElementById('screenDisplay');
         
         ws.onmessage = async (e) => {
-            const blob = new Blob([e.data], { type: 'image/jpeg' });
-            if (img.src) URL.revokeObjectURL(img.src);
-            img.src = URL.createObjectURL(blob);
+            if (e.data instanceof Blob || e.data instanceof ArrayBuffer) {
+                const blob = new Blob([e.data], { type: 'image/jpeg' });
+                const url = URL.createObjectURL(blob);
+                img.onload = () => URL.revokeObjectURL(url);
+                img.src = url;
+            }
         };
 
         img.addEventListener('click', (e) => {
