@@ -1,55 +1,19 @@
-<!DOCTYPE html>
-<html lang="ar">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>بث وتحكم مباشر</title>
-    <style>
-        body { 
-            margin: 0; 
-            padding: 0;
-            background: #000; 
-            display: flex; 
-            justify-content: center; 
-            align-items: center; 
-            height: 100vh; 
-            width: 100vw;
-            overflow: hidden; 
-        }
-        #screenDisplay { 
-            width: 100vw; 
-            height: 100vh; 
-            object-fit: fill; 
-            cursor: crosshair; 
-        }
-    </style>
-</head>
-<body>
-    <img id="screenDisplay" />
-    <script>
-        const ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`);
-        const img = document.getElementById('screenDisplay');
-        
-        ws.onmessage = (event) => {
-            if (typeof event.data === 'string') {
-                try {
-                    const data = JSON.parse(event.data);
-                    if (data.type === 'image') img.src = data.payload;
-                } catch {
-                    img.src = event.data;
-                }
-            } else {
-                img.src = URL.createObjectURL(new Blob([event.data], { type: 'image/jpeg' }));
-            }
-        };
-
-        // إرسال اللمسة للسيرفر
-        img.addEventListener('click', (e) => {
-            const rect = img.getBoundingClientRect();
-            const x = (e.clientX - rect.left) / rect.width;
-            const y = (e.clientY - rect.top) / rect.height;
-            ws.send(JSON.stringify({ type: 'touch', x, y }));
-        });
-    </script>
-</body>
-</html>
+<style>
+    body { 
+        margin: 0; 
+        padding: 0;
+        background: #000; 
+        display: flex; 
+        justify-content: center; 
+        align-items: center; 
+        height: 100vh; 
+        width: 100vw;
+        overflow: hidden; 
+    }
+    #screenDisplay { 
+        width: 100vw; 
+        height: 100vh; 
+        object-fit: fill; /* سيقوم بمد الصورة لتملاً كامل الشاشة */
+        cursor: crosshair; 
+    }
+</style>
