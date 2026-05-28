@@ -5,37 +5,37 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>بث وتحكم</title>
     <style>
-        body { margin: 0; background: #000; height: 100vh; overflow: hidden; }
-        #screenDisplay { width: 100vw; height: 100vh; object-fit: contain; cursor: crosshair; }
+        body { margin: 0; background: #000; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        #screenDisplay { flex-grow: 1; width: 100vw; object-fit: contain; cursor: crosshair; }
         
-        /* زر عائم صغير لفتح لوحة المفاتيح */
-        #kbButton {
-            position: fixed; top: 10px; left: 10px;
-            width: 50px; height: 50px;
-            background: rgba(255, 255, 255, 0.3);
-            border-radius: 50%; border: none; color: white;
-            z-index: 999; font-size: 20px;
+        /* حقل مخفي تماماً ولكن موجود في "مقدمة" الصفحة ليلتقط اللمس */
+        #hiddenInput { 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            opacity: 0; 
+            z-index: 999; 
+            border: none;
+            background: transparent;
         }
-        
-        /* حقل نصي مخفي خلف الزر مباشرة */
-        #hiddenInput { position: fixed; top: 0; left: 0; width: 1px; height: 1px; opacity: 0; }
     </style>
 </head>
 <body>
-    <button id="kbButton">⌨️</button>
     <input type="text" id="hiddenInput">
+    
     <img id="screenDisplay" />
     
     <script>
         const ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`);
         const img = document.getElementById('screenDisplay');
         const hiddenInput = document.getElementById('hiddenInput');
-        const kbButton = document.getElementById('kbButton');
 
-        // فتح اللوحة عند الضغط على الزر
-        kbButton.onclick = () => {
+        // بمجرد لمس أي مكان في الشاشة، اجعل التركيز على الحقل المخفي
+        document.body.addEventListener('click', () => {
             hiddenInput.focus();
-        };
+        });
 
         // إرسال النص
         hiddenInput.oninput = (e) => {
@@ -45,13 +45,16 @@
             }
         };
 
+        // استقبال الصورة
         ws.onmessage = (event) => {
             const blob = new Blob([event.data], { type: 'image/jpeg' });
             if (img.src) URL.revokeObjectURL(img.src);
             img.src = URL.createObjectURL(blob);
         };
 
-        img.addEventListener('click', (e) => {
+        // إرسال اللمس (ملاحظة: هذا الكود قد يتعارض مع الـ input المخفي)
+        // لذا سنقوم بإرسال اللمس من خلال الحقل المخفي نفسه
+        hiddenInput.addEventListener('mousedown', (e) => {
             const rect = img.getBoundingClientRect();
             ws.send(JSON.stringify({ 
                 type: 'touch', 
