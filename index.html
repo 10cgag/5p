@@ -2,42 +2,46 @@
 <html lang="ar">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>بث وتحكم</title>
     <style>
-        body { margin: 0; background: #000; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
-        #screenDisplay { flex-grow: 1; width: 100vw; object-fit: contain; cursor: crosshair; }
+        body { margin: 0; background: #000; height: 100vh; overflow: hidden; }
+        #screenDisplay { width: 100vw; height: 100vh; object-fit: contain; cursor: crosshair; }
         
-        /* حقل مخفي بذكاء: شفاف تماماً وموجود في الأسفل */
-        #keyboardInput { 
-            position: fixed; 
-            bottom: 0; 
-            width: 100%; 
-            height: 40px; 
-            opacity: 0.01; /* شفاف لكنه موجود */
-            z-index: 100;
+        /* زر عائم صغير لفتح لوحة المفاتيح */
+        #kbButton {
+            position: fixed; top: 10px; left: 10px;
+            width: 50px; height: 50px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 50%; border: none; color: white;
+            z-index: 999; font-size: 20px;
         }
+        
+        /* حقل نصي مخفي خلف الزر مباشرة */
+        #hiddenInput { position: fixed; top: 0; left: 0; width: 1px; height: 1px; opacity: 0; }
     </style>
 </head>
 <body>
+    <button id="kbButton">⌨️</button>
+    <input type="text" id="hiddenInput">
     <img id="screenDisplay" />
-    <input type="text" id="keyboardInput" placeholder="اضغط هنا">
     
     <script>
         const ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`);
         const img = document.getElementById('screenDisplay');
-        const keyboardInput = document.getElementById('keyboardInput');
+        const hiddenInput = document.getElementById('hiddenInput');
+        const kbButton = document.getElementById('kbButton');
 
-        // عند لمس الشاشة في أي مكان، ركز على الحقل المخفي
-        document.body.addEventListener('click', () => {
-            keyboardInput.focus();
-        });
+        // فتح اللوحة عند الضغط على الزر
+        kbButton.onclick = () => {
+            hiddenInput.focus();
+        };
 
         // إرسال النص
-        keyboardInput.oninput = (e) => {
+        hiddenInput.oninput = (e) => {
             if (e.target.value.length > 0) {
                 ws.send(JSON.stringify({ type: 'text', value: e.target.value }));
-                keyboardInput.value = ""; 
+                hiddenInput.value = ""; 
             }
         };
 
