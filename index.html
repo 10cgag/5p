@@ -6,32 +6,41 @@
     <title>بث وتحكم</title>
     <style>
         body { margin: 0; background: #000; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
-        #screenDisplay { flex-grow: 1; width: 100vw; object-fit: contain; cursor: crosshair; }
-        .controls { height: 10vh; display: flex; justify-content: space-around; align-items: center; background: #333; }
-        button { padding: 10px; color: white; background: #555; border: none; border-radius: 5px; cursor: pointer; }
+        /* منطقة البث تحتل كامل المساحة */
+        #screenDisplay { flex-grow: 1; width: 100vw; object-fit: contain; cursor: crosshair; z-index: 1; }
+        /* حقل نصي مخفي تماماً في الخلفية ولا يغطي الصورة */
+        #keyboardInput { position: absolute; opacity: 0; top: -100px; }
     </style>
 </head>
 <body>
+    <input type="text" id="keyboardInput">
     <img id="screenDisplay" />
-    <div class="controls">
-        <button onclick="setFit('fill')">ملء الشاشة</button>
-        <button onclick="setFit('contain')">إظهار الكل</button>
-    </div>
+    
     <script>
-        // التعديل هنا: Railway غالباً ما يحتاج تحديد المنفذ 8080 يدوياً في رابط الـ WebSocket
-        const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.hostname}:8080`;
-        const ws = new WebSocket(wsUrl);
-        
+        // الاتصال المباشر (Railway سيقوم بالتوجيه التلقائي للمنفذ)
+        const ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`);
         const img = document.getElementById('screenDisplay');
-        
-        function setFit(mode) { img.style.objectFit = mode; }
+        const keyboardInput = document.getElementById('keyboardInput');
 
+        // عند لمس الشاشة في أي مكان -> افتح لوحة المفاتيح
+        document.body.addEventListener('click', () => {
+            keyboardInput.focus();
+        });
+
+        // عند الكتابة -> أرسل النص
+        keyboardInput.oninput = (e) => {
+            ws.send(JSON.stringify({ type: 'text', value: e.target.value }));
+            keyboardInput.value = ""; 
+        };
+
+        // عرض الصورة (المسؤول عن حل مشكلة الشاشة السوداء)
         ws.onmessage = (event) => {
             const blob = new Blob([event.data], { type: 'image/jpeg' });
             if (img.src) URL.revokeObjectURL(img.src);
             img.src = URL.createObjectURL(blob);
         };
 
+        // إرسال اللمس
         img.addEventListener('click', (e) => {
             const rect = img.getBoundingClientRect();
             ws.send(JSON.stringify({ 
