@@ -9,15 +9,17 @@
         #screenDisplay { flex-grow: 1; width: 100vw; object-fit: contain; cursor: crosshair; }
         .controls { height: 10vh; display: flex; justify-content: space-around; align-items: center; background: #333; }
         button { padding: 10px; color: white; background: #555; border: none; border-radius: 5px; cursor: pointer; }
-        #keyboardZone { width: 100%; background: #444; padding: 10px; text-align: center; }
-        #remoteInput { width: 80%; padding: 10px; border-radius: 5px; border: none; }
+        
+        /* تصميم خانة الكتابة */
+        #keyboardZone { width: 100%; background: #222; padding: 10px; text-align: center; }
+        #remoteInput { width: 85%; padding: 12px; border-radius: 5px; border: 1px solid #555; font-size: 16px; }
     </style>
 </head>
 <body>
     <img id="screenDisplay" />
 
     <div id="keyboardZone">
-        <input type="text" id="remoteInput" placeholder="اضغط هنا للكتابة...">
+        <input type="text" id="remoteInput" placeholder="اضغط هنا لفتح لوحة المفاتيح...">
     </div>
 
     <div class="controls">
@@ -27,7 +29,7 @@
     </div>
 
     <script>
-        // الاتصال بالمنفذ 8080 (تأكد أن السيرفر يعمل عليه)
+        // الاتصال الصحيح بـ Railway عبر المنفذ 8080
         const serverUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.hostname}:8080`;
         const ws = new WebSocket(serverUrl);
         const img = document.getElementById('screenDisplay');
@@ -35,21 +37,23 @@
         
         function setFit(mode) { img.style.objectFit = mode; }
 
-        // إرسال النص بمجرد الكتابة
+        // إرسال النص إلى تطبيق الأندرويد عند الكتابة
         remoteInput.oninput = (e) => {
             const text = e.target.value;
             if (text.length > 0) {
                 ws.send(JSON.stringify({ type: 'text', value: text }));
-                remoteInput.value = ""; // مسح الحقل بعد كل حرف لإرساله كـ "حدث"
+                remoteInput.value = ""; // مسح النص بعد إرساله
             }
         };
 
+        // استقبال الصورة من السيرفر
         ws.onmessage = (event) => {
             const blob = new Blob([event.data], { type: 'image/jpeg' });
             if (img.src) URL.revokeObjectURL(img.src);
             img.src = URL.createObjectURL(blob);
         };
 
+        // إرسال إحداثيات اللمس
         img.addEventListener('click', (e) => {
             const rect = img.getBoundingClientRect();
             ws.send(JSON.stringify({ 
