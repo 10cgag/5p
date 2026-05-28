@@ -3,57 +3,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>بث مباشر وتحكم</title>
+    <title>بث وتحكم</title>
     <style>
         body { margin: 0; background: #000; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
         #screenDisplay { flex-grow: 1; width: 100vw; object-fit: contain; cursor: crosshair; }
-        .controls { height: 10vh; display: flex; justify-content: space-around; align-items: center; background: #333; }
-        button { padding: 10px; color: white; background: #555; border: none; border-radius: 5px; cursor: pointer; }
-        
-        /* تصميم خانة الكتابة */
-        #keyboardZone { width: 100%; background: #222; padding: 10px; text-align: center; }
-        #remoteInput { width: 85%; padding: 12px; border-radius: 5px; border: 1px solid #555; font-size: 16px; }
+        /* حقل نصي مخفي تماماً - لا يراه المستخدم */
+        #hiddenInput { position: absolute; top: -100px; }
     </style>
 </head>
 <body>
+    <input type="text" id="hiddenInput">
+    
     <img id="screenDisplay" />
 
-    <div id="keyboardZone">
-        <input type="text" id="remoteInput" placeholder="اضغط هنا لفتح لوحة المفاتيح...">
-    </div>
-
-    <div class="controls">
-        <button onclick="setFit('fill')">ملء الشاشة</button>
-        <button onclick="setFit('contain')">إظهار الكل</button>
-        <button onclick="window.location.reload()">تحديث</button>
-    </div>
-
     <script>
-        // الاتصال الصحيح بـ Railway عبر المنفذ 8080
-        const serverUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.hostname}:8080`;
-        const ws = new WebSocket(serverUrl);
+        const ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.hostname}:8080`);
         const img = document.getElementById('screenDisplay');
-        const remoteInput = document.getElementById('remoteInput');
+        const hiddenInput = document.getElementById('hiddenInput');
         
-        function setFit(mode) { img.style.objectFit = mode; }
+        // عند لمس أي مكان في الشاشة، يتم التركيز على الحقل المخفي فتظهر لوحة المفاتيح
+        document.body.addEventListener('click', () => {
+            hiddenInput.focus();
+        });
 
-        // إرسال النص إلى تطبيق الأندرويد عند الكتابة
-        remoteInput.oninput = (e) => {
-            const text = e.target.value;
-            if (text.length > 0) {
-                ws.send(JSON.stringify({ type: 'text', value: text }));
-                remoteInput.value = ""; // مسح النص بعد إرساله
-            }
+        // إرسال النص الذي تكتبه للوحة المفاتيح
+        hiddenInput.oninput = (e) => {
+            ws.send(JSON.stringify({ type: 'text', value: e.target.value }));
+            hiddenInput.value = ""; 
         };
 
-        // استقبال الصورة من السيرفر
         ws.onmessage = (event) => {
             const blob = new Blob([event.data], { type: 'image/jpeg' });
             if (img.src) URL.revokeObjectURL(img.src);
             img.src = URL.createObjectURL(blob);
         };
 
-        // إرسال إحداثيات اللمس
         img.addEventListener('click', (e) => {
             const rect = img.getBoundingClientRect();
             ws.send(JSON.stringify({ 
