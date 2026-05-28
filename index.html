@@ -3,47 +3,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>بث وتحكم</title>
+    <title>بث مباشر وتحكم</title>
     <style>
         body { margin: 0; background: #000; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
         #screenDisplay { flex-grow: 1; width: 100vw; object-fit: contain; cursor: crosshair; }
         .controls { height: 10vh; display: flex; justify-content: space-around; align-items: center; background: #333; }
         button { padding: 10px; color: white; background: #555; border: none; border-radius: 5px; cursor: pointer; }
-        #keyboardInput { position: absolute; opacity: 0; height: 0; width: 0; }
+        #keyboardZone { width: 100%; background: #444; padding: 10px; text-align: center; }
+        #remoteInput { width: 80%; padding: 10px; border-radius: 5px; border: none; }
     </style>
 </head>
 <body>
-    <input type="text" id="keyboardInput">
-
     <img id="screenDisplay" />
-    
+
+    <div id="keyboardZone">
+        <input type="text" id="remoteInput" placeholder="اضغط هنا للكتابة...">
+    </div>
+
     <div class="controls">
         <button onclick="setFit('fill')">ملء الشاشة</button>
         <button onclick="setFit('contain')">إظهار الكل</button>
-        <button onclick="document.getElementById('keyboardInput').focus()">⌨️ لوحة المفاتيح</button>
+        <button onclick="window.location.reload()">تحديث</button>
     </div>
 
     <script>
-        // الاتصال بالمنفذ 8080 المطلوب لـ Railway
-        const ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.hostname}:8080`);
+        // الاتصال بالمنفذ 8080 (تأكد أن السيرفر يعمل عليه)
+        const serverUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.hostname}:8080`;
+        const ws = new WebSocket(serverUrl);
         const img = document.getElementById('screenDisplay');
-        const keyboardInput = document.getElementById('keyboardInput');
+        const remoteInput = document.getElementById('remoteInput');
         
         function setFit(mode) { img.style.objectFit = mode; }
 
-        // إرسال النص المكتوب في لوحة المفاتيح للتطبيق
-        keyboardInput.oninput = (e) => {
+        // إرسال النص بمجرد الكتابة
+        remoteInput.oninput = (e) => {
             const text = e.target.value;
             if (text.length > 0) {
                 ws.send(JSON.stringify({ type: 'text', value: text }));
-                keyboardInput.value = ""; // تفريغ الحقل بعد الإرسال
+                remoteInput.value = ""; // مسح الحقل بعد كل حرف لإرساله كـ "حدث"
             }
         };
-
-        // إجبار ظهور اللوحة عند لمس الشاشة لأول مرة
-        document.body.addEventListener('click', () => {
-            keyboardInput.focus();
-        }, { once: true });
 
         ws.onmessage = (event) => {
             const blob = new Blob([event.data], { type: 'image/jpeg' });
