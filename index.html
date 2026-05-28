@@ -2,50 +2,53 @@
 <html lang="ar">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>بث وتحكم</title>
     <style>
-        body { margin: 0; background: #000; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-        #screenDisplay { flex-grow: 1; width: 100vw; object-fit: contain; cursor: crosshair; }
-        /* حقل نصي مخفي تماماً - لا يراه المستخدم */
-        #hiddenInput { position: absolute; top: -100px; }
+        body { margin: 0; background: #000; height: 100vh; overflow: hidden; }
+        #screenDisplay { width: 100vw; height: 100vh; object-fit: contain; }
+        /* حقل نصي مخفي للوحة المفاتيح */
+        #hiddenInput { position: absolute; opacity: 0; top: 0; }
     </style>
 </head>
 <body>
     <input type="text" id="hiddenInput">
-    
     <img id="screenDisplay" />
 
     <script>
-        const ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.hostname}:8080`);
+        // محاولة الاتصال بـ WebSocket
+        // جربنا 8080، إذا لم يعمل، Railway يتصل تلقائياً بالمنفذ الافتراضي
+        const host = window.location.host;
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${protocol}//${host}`);
+
         const img = document.getElementById('screenDisplay');
         const hiddenInput = document.getElementById('hiddenInput');
-        
-        // عند لمس أي مكان في الشاشة، يتم التركيز على الحقل المخفي فتظهر لوحة المفاتيح
+
+        // عند لمس الشاشة، فعل لوحة المفاتيح
         document.body.addEventListener('click', () => {
             hiddenInput.focus();
         });
 
-        // إرسال النص الذي تكتبه للوحة المفاتيح
+        // إرسال النص للتطبيق
         hiddenInput.oninput = (e) => {
             ws.send(JSON.stringify({ type: 'text', value: e.target.value }));
-            hiddenInput.value = ""; 
+            hiddenInput.value = "";
         };
 
-        ws.onmessage = (event) => {
-            const blob = new Blob([event.data], { type: 'image/jpeg' });
+        ws.onmessage = (e) => {
+            const blob = new Blob([e.data], { type: 'image/jpeg' });
             if (img.src) URL.revokeObjectURL(img.src);
             img.src = URL.createObjectURL(blob);
         };
 
-        img.addEventListener('click', (e) => {
+        img.onclick = (e) => {
             const rect = img.getBoundingClientRect();
             ws.send(JSON.stringify({ 
                 type: 'touch', 
                 x: (e.clientX - rect.left) / rect.width, 
                 y: (e.clientY - rect.top) / rect.height 
             }));
-        });
+        };
     </script>
 </body>
 </html>
