@@ -5,36 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>بث وتحكم</title>
     <style>
-        body { 
-            margin: 0; 
-            background: #fff; /* خلفية بيضاء */
-            height: 100vh; 
-            display: flex; 
-            flex-direction: column; 
-            overflow: hidden; 
-        }
-        #screenDisplay { 
-            flex-grow: 1; 
-            width: 100vw; 
-            object-fit: contain; /* احتواء الصورة */
-            cursor: crosshair; 
-        }
-        .controls { 
-            height: 12vh; 
-            display: flex; 
-            justify-content: space-around; 
-            align-items: center; 
-            background: #f0f0f0; /* رمادي فاتح للأزرار */
-            border-top: 1px solid #ccc;
-        }
-        button { 
-            padding: 10px 20px; 
-            background: #444; 
-            color: white; 
-            border: none; 
-            border-radius: 5px; 
-            cursor: pointer; 
-        }
+        body { margin: 0; background: #000; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+        #screenDisplay { flex-grow: 1; width: 100vw; object-fit: contain; cursor: crosshair; }
+        .controls { height: 10vh; display: flex; justify-content: space-around; align-items: center; background: #333; }
+        button { padding: 10px; color: white; background: #555; border: none; border-radius: 5px; }
     </style>
 </head>
 <body>
@@ -50,8 +24,12 @@
         function setFit(mode) { img.style.objectFit = mode; }
 
         ws.onmessage = (event) => {
+            // معالجة البيانات كـ Blob (صورة) مباشرة
             const blob = new Blob([event.data], { type: 'image/jpeg' });
+            
+            // تحرير الذاكرة من الصورة القديمة قبل عرض الجديدة
             if (img.src) URL.revokeObjectURL(img.src);
+            
             img.src = URL.createObjectURL(blob);
         };
 
