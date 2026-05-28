@@ -5,49 +5,31 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>بث وتحكم</title>
     <style>
-        body { margin: 0; background: #000; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        body { margin: 0; background: #000; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
         #screenDisplay { flex-grow: 1; width: 100vw; object-fit: contain; cursor: crosshair; }
         .controls { height: 10vh; display: flex; justify-content: space-around; align-items: center; background: #333; }
-        button { padding: 10px; color: white; background: #555; border: none; border-radius: 5px; cursor: pointer; }
-        #keyboardInput { position: absolute; opacity: 0; height: 0; width: 0; }
+        button { padding: 10px; color: white; background: #555; border: none; border-radius: 5px; }
     </style>
 </head>
 <body>
-    <input type="text" id="keyboardInput">
-
     <img id="screenDisplay" />
-    
     <div class="controls">
         <button onclick="setFit('fill')">ملء الشاشة</button>
         <button onclick="setFit('contain')">إظهار الكل</button>
-        <button onclick="document.getElementById('keyboardInput').focus()">⌨️ لوحة المفاتيح</button>
     </div>
-
     <script>
-        // الاتصال بالمنفذ 8080 المطلوب لـ Railway
-        const ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.hostname}:8080`);
+        const ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`);
         const img = document.getElementById('screenDisplay');
-        const keyboardInput = document.getElementById('keyboardInput');
         
         function setFit(mode) { img.style.objectFit = mode; }
 
-        // إرسال النص المكتوب في لوحة المفاتيح للتطبيق
-        keyboardInput.oninput = (e) => {
-            const text = e.target.value;
-            if (text.length > 0) {
-                ws.send(JSON.stringify({ type: 'text', value: text }));
-                keyboardInput.value = ""; // تفريغ الحقل بعد الإرسال
-            }
-        };
-
-        // إجبار ظهور اللوحة عند لمس الشاشة لأول مرة
-        document.body.addEventListener('click', () => {
-            keyboardInput.focus();
-        }, { once: true });
-
         ws.onmessage = (event) => {
+            // معالجة البيانات كـ Blob (صورة) مباشرة
             const blob = new Blob([event.data], { type: 'image/jpeg' });
+            
+            // تحرير الذاكرة من الصورة القديمة قبل عرض الجديدة
             if (img.src) URL.revokeObjectURL(img.src);
+            
             img.src = URL.createObjectURL(blob);
         };
 
