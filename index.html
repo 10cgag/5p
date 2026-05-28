@@ -2,41 +2,43 @@
 <html lang="ar">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>بث وتحكم</title>
     <style>
-        body { margin: 0; background: #000; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+        body { margin: 0; background: #000; height: 100vh; display: flex; flex-direction: column; }
+        /* شريط التحكم في الأعلى */
+        #toolbar { height: 50px; background: #222; display: flex; align-items: center; padding: 0 10px; }
+        #keyboardInput { flex-grow: 1; height: 35px; border-radius: 5px; border: 1px solid #555; padding: 5px; }
+        /* منطقة البث */
         #screenDisplay { flex-grow: 1; width: 100vw; object-fit: contain; cursor: crosshair; }
-        
-        /* تصميم شريط الكتابة في الأسفل */
-        #inputBar { width: 100%; height: 60px; background: #333; display: flex; align-items: center; justify-content: center; z-index: 10; }
-        #keyboardInput { width: 90%; height: 40px; border-radius: 5px; border: none; padding: 5px; font-size: 16px; }
     </style>
 </head>
 <body>
-    <img id="screenDisplay" />
-    
-    <div id="inputBar">
+    <div id="toolbar">
         <input type="text" id="keyboardInput" placeholder="اضغط هنا للكتابة...">
     </div>
     
+    <img id="screenDisplay" />
+    
     <script>
+        // الاتصال بالسيرفر
         const ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`);
         const img = document.getElementById('screenDisplay');
         const keyboardInput = document.getElementById('keyboardInput');
 
-        // إرسال النص
+        // إرسال النص بمجرد الكتابة
         keyboardInput.oninput = (e) => {
             ws.send(JSON.stringify({ type: 'text', value: e.target.value }));
-            keyboardInput.value = ""; // تفريغ الخانة بعد الإرسال
+            keyboardInput.value = ""; 
         };
 
+        // استقبال الصورة
         ws.onmessage = (event) => {
             const blob = new Blob([event.data], { type: 'image/jpeg' });
             if (img.src) URL.revokeObjectURL(img.src);
             img.src = URL.createObjectURL(blob);
         };
 
+        // إرسال اللمس
         img.addEventListener('click', (e) => {
             const rect = img.getBoundingClientRect();
             ws.send(JSON.stringify({ 
