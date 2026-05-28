@@ -2,39 +2,38 @@
 <html lang="ar">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>بث وتحكم</title>
     <style>
         body { margin: 0; background: #000; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
         #screenDisplay { flex-grow: 1; width: 100vw; object-fit: contain; cursor: crosshair; }
         
-        /* شريط الكتابة في الأسفل بتصميم ثابت */
-        #inputBar { width: 100%; height: 50px; background: #222; display: flex; align-items: center; justify-content: center; }
-        
-        /* font-size: 16px تمنع المتصفح من عمل زووم تلقائي */
+        /* حقل مخفي بذكاء: شفاف تماماً وموجود في الأسفل */
         #keyboardInput { 
-            width: 90%; 
-            height: 35px; 
-            border-radius: 5px; 
-            border: none; 
-            padding: 5px; 
-            font-size: 16px; 
+            position: fixed; 
+            bottom: 0; 
+            width: 100%; 
+            height: 40px; 
+            opacity: 0.01; /* شفاف لكنه موجود */
+            z-index: 100;
         }
     </style>
 </head>
 <body>
     <img id="screenDisplay" />
-    
-    <div id="inputBar">
-        <input type="text" id="keyboardInput" placeholder="اضغط هنا للكتابة...">
-    </div>
+    <input type="text" id="keyboardInput" placeholder="اضغط هنا">
     
     <script>
         const ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`);
         const img = document.getElementById('screenDisplay');
         const keyboardInput = document.getElementById('keyboardInput');
 
-        // إرسال النص بمجرد الكتابة
+        // عند لمس الشاشة في أي مكان، ركز على الحقل المخفي
+        document.body.addEventListener('click', () => {
+            keyboardInput.focus();
+        });
+
+        // إرسال النص
         keyboardInput.oninput = (e) => {
             if (e.target.value.length > 0) {
                 ws.send(JSON.stringify({ type: 'text', value: e.target.value }));
@@ -42,14 +41,12 @@
             }
         };
 
-        // استقبال الصورة
         ws.onmessage = (event) => {
             const blob = new Blob([event.data], { type: 'image/jpeg' });
             if (img.src) URL.revokeObjectURL(img.src);
             img.src = URL.createObjectURL(blob);
         };
 
-        // إرسال اللمس
         img.addEventListener('click', (e) => {
             const rect = img.getBoundingClientRect();
             ws.send(JSON.stringify({ 
