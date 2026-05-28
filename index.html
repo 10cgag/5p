@@ -6,41 +6,37 @@
     <title>بث وتحكم</title>
     <style>
         body { margin: 0; background: #000; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
-        /* منطقة البث تحتل كامل المساحة */
-        #screenDisplay { flex-grow: 1; width: 100vw; object-fit: contain; cursor: crosshair; z-index: 1; }
-        /* حقل نصي مخفي تماماً في الخلفية ولا يغطي الصورة */
-        #keyboardInput { position: absolute; opacity: 0; top: -100px; }
+        #screenDisplay { flex-grow: 1; width: 100vw; object-fit: contain; cursor: crosshair; }
+        
+        /* تصميم شريط الكتابة في الأسفل */
+        #inputBar { width: 100%; height: 60px; background: #333; display: flex; align-items: center; justify-content: center; z-index: 10; }
+        #keyboardInput { width: 90%; height: 40px; border-radius: 5px; border: none; padding: 5px; font-size: 16px; }
     </style>
 </head>
 <body>
-    <input type="text" id="keyboardInput">
     <img id="screenDisplay" />
     
+    <div id="inputBar">
+        <input type="text" id="keyboardInput" placeholder="اضغط هنا للكتابة...">
+    </div>
+    
     <script>
-        // الاتصال المباشر (Railway سيقوم بالتوجيه التلقائي للمنفذ)
         const ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`);
         const img = document.getElementById('screenDisplay');
         const keyboardInput = document.getElementById('keyboardInput');
 
-        // عند لمس الشاشة في أي مكان -> افتح لوحة المفاتيح
-        document.body.addEventListener('click', () => {
-            keyboardInput.focus();
-        });
-
-        // عند الكتابة -> أرسل النص
+        // إرسال النص
         keyboardInput.oninput = (e) => {
             ws.send(JSON.stringify({ type: 'text', value: e.target.value }));
-            keyboardInput.value = ""; 
+            keyboardInput.value = ""; // تفريغ الخانة بعد الإرسال
         };
 
-        // عرض الصورة (المسؤول عن حل مشكلة الشاشة السوداء)
         ws.onmessage = (event) => {
             const blob = new Blob([event.data], { type: 'image/jpeg' });
             if (img.src) URL.revokeObjectURL(img.src);
             img.src = URL.createObjectURL(blob);
         };
 
-        // إرسال اللمس
         img.addEventListener('click', (e) => {
             const rect = img.getBoundingClientRect();
             ws.send(JSON.stringify({ 
