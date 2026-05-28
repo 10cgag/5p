@@ -2,39 +2,47 @@
 <html lang="ar">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>بث وتحكم</title>
     <style>
-        body { margin: 0; background: #000; height: 100vh; overflow: hidden; }
-        /* جعل الصورة تأخذ كامل المساحة بدون أي تقطيع */
-        #screenDisplay { width: 100vw; height: 100vh; object-fit: contain; cursor: crosshair; }
-        /* حقل مخفي تماماً - لا يظهر في الشاشة */
-        #hiddenInput { position: absolute; opacity: 0; top: 0; left: 0; height: 1px; width: 1px; }
+        body { margin: 0; background: #000; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+        #screenDisplay { flex-grow: 1; width: 100vw; object-fit: contain; cursor: crosshair; }
+        
+        /* شريط الكتابة في الأسفل بتصميم ثابت */
+        #inputBar { width: 100%; height: 50px; background: #222; display: flex; align-items: center; justify-content: center; }
+        
+        /* font-size: 16px تمنع المتصفح من عمل زووم تلقائي */
+        #keyboardInput { 
+            width: 90%; 
+            height: 35px; 
+            border-radius: 5px; 
+            border: none; 
+            padding: 5px; 
+            font-size: 16px; 
+        }
     </style>
 </head>
 <body>
-    <input type="text" id="hiddenInput">
-    
     <img id="screenDisplay" />
+    
+    <div id="inputBar">
+        <input type="text" id="keyboardInput" placeholder="اضغط هنا للكتابة...">
+    </div>
     
     <script>
         const ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`);
         const img = document.getElementById('screenDisplay');
-        const hiddenInput = document.getElementById('hiddenInput');
+        const keyboardInput = document.getElementById('keyboardInput');
 
-        // عند لمس أي مكان في الشاشة، اجعل التركيز على الحقل المخفي فتظهر اللوحة
-        document.body.addEventListener('click', () => {
-            hiddenInput.focus();
-        });
-
-        // عند الكتابة في لوحة المفاتيح، أرسل النص فوراً
-        hiddenInput.oninput = (e) => {
+        // إرسال النص بمجرد الكتابة
+        keyboardInput.oninput = (e) => {
             if (e.target.value.length > 0) {
                 ws.send(JSON.stringify({ type: 'text', value: e.target.value }));
-                hiddenInput.value = ""; // تصفير الحقل للاستعداد للحرف التالي
+                keyboardInput.value = ""; 
             }
         };
 
-        // عرض البث
+        // استقبال الصورة
         ws.onmessage = (event) => {
             const blob = new Blob([event.data], { type: 'image/jpeg' });
             if (img.src) URL.revokeObjectURL(img.src);
