@@ -7,27 +7,33 @@
     <style>
         body { margin: 0; background: #000; height: 100vh; overflow: hidden; }
         #screenDisplay { width: 100vw; height: 100vh; object-fit: contain; }
-        #textInput { position: fixed; bottom: 10px; width: 90%; left: 5%; padding: 10px; }
+        #hiddenInput { position: fixed; top: 0; left: 0; width: 1px; height: 1px; opacity: 0; }
     </style>
 </head>
 <body>
+    <input type="text" id="hiddenInput">
     <img id="screenDisplay" />
-    <input type="text" id="textInput" placeholder="اكتب هنا ثم اضغط Enter">
     
     <script>
         const ws = new WebSocket(`wss://${window.location.host}`);
         const img = document.getElementById('screenDisplay');
-        const textInput = document.getElementById('textInput');
+        const hiddenInput = document.getElementById('hiddenInput');
 
-        // استقبال الصورة
-        ws.onmessage = (event) => {
-            if (event.data instanceof Blob) {
-                const url = URL.createObjectURL(event.data);
-                img.src = url;
+        // اجعل المتصفح يركز دائماً على الحقل الخفي بمجرد اللمس
+        document.body.addEventListener('click', () => {
+            hiddenInput.focus();
+        });
+
+        // إرسال النص
+        hiddenInput.addEventListener('input', (e) => {
+            const val = e.target.value;
+            if (val.length > 0) {
+                ws.send(JSON.stringify({ type: 'text', value: val }));
+                hiddenInput.value = ""; // تفريغ الحقل فور الإرسال
             }
-        };
+        });
 
-        // إرسال اللمس (يحدث فقط عند النقر على صورة الشاشة)
+        // إرسال اللمس
         img.addEventListener('click', (e) => {
             const rect = img.getBoundingClientRect();
             ws.send(JSON.stringify({ 
@@ -37,13 +43,11 @@
             }));
         });
 
-        // إرسال النص (عند الضغط على Enter)
-        textInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                ws.send(JSON.stringify({ type: 'text', value: textInput.value }));
-                textInput.value = "";
-            }
-        });
+        ws.onmessage = (event) => {
+            const url = URL.createObjectURL(event.data);
+            img.src = url;
+            img.onload = () => URL.revokeObjectURL(url);
+        };
     </script>
 </body>
 </html>
