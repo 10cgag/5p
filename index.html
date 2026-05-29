@@ -1,25 +1,46 @@
-wss.on('connection', (ws) => {
-    ws.on('message', (data) => {
-        // محاولة فحص الرسالة
-        try {
-            const messageString = data.toString();
-            const parsed = JSON.parse(messageString);
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>بث وتحكم</title>
+    <style>
+        body { margin: 0; background: #000; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+        #screenDisplay { flex-grow: 1; width: 100vw; object-fit: contain; cursor: crosshair; }
+        .controls { height: 10vh; display: flex; justify-content: space-around; align-items: center; background: #333; }
+        button { padding: 10px; color: white; background: #555; border: none; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <img id="screenDisplay" />
+    <div class="controls">
+        <button onclick="setFit('fill')">ملء الشاشة</button>
+        <button onclick="setFit('contain')">إظهار الكل</button>
+    </div>
+    <script>
+        const ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`);
+        const img = document.getElementById('screenDisplay');
+        
+        function setFit(mode) { img.style.objectFit = mode; }
+
+        ws.onmessage = (event) => {
+            // معالجة البيانات كـ Blob (صورة) مباشرة
+            const blob = new Blob([event.data], { type: 'image/jpeg' });
             
-            // إذا كانت الرسالة من نوع 'touch' أو 'text'، أرسلها للهاتف
-            if (parsed.type === 'touch' || parsed.type === 'text') {
-                wss.clients.forEach((client) => {
-                    if (client !== ws && client.readyState === 1) {
-                        client.send(messageString);
-                    }
-                });
-            }
-        } catch (e) {
-            // إذا لم تكن JSON فهي صورة (Binary)، أرسلها للهاتف
-            wss.clients.forEach((client) => {
-                if (client !== ws && client.readyState === 1) {
-                    client.send(data);
-                }
-            });
-        }
-    });
-});
+            // تحرير الذاكرة من الصورة القديمة قبل عرض الجديدة
+            if (img.src) URL.revokeObjectURL(img.src);
+            
+            img.src = URL.createObjectURL(blob);
+        };
+
+        img.addEventListener('click', (e) => {
+            const rect = img.getBoundingClientRect();
+            ws.send(JSON.stringify({ 
+                type: 'touch', 
+                x: (e.clientX - rect.left) / rect.width, 
+                y: (e.clientY - rect.top) / rect.height 
+            }));
+        });
+    </script>
+</body>
+</html>
