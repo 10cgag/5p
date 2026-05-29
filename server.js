@@ -7,12 +7,18 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+// إضافة هذا السطر مهم جداً ليعرف السيرفر مكان الملفات الثابتة (مثل index.html)
+app.use(express.static(__dirname)); 
+
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
 
 wss.on('connection', (ws) => {
     ws.on('message', (data) => {
         try {
             const messageString = data.toString();
+            // تأكد أن البيانات قابلة للتحويل إلى JSON
             const parsed = JSON.parse(messageString);
             
             // إعادة توجيه اللمس والنصوص
