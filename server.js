@@ -7,8 +7,6 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
-app.use(express.static(__dirname)); 
-
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 wss.on('connection', (ws) => {
@@ -16,18 +14,27 @@ wss.on('connection', (ws) => {
         try {
             const messageString = data.toString();
             const parsed = JSON.parse(messageString);
+            
+            // إعادة توجيه اللمس والنصوص
             if (parsed.type === 'touch' || parsed.type === 'text') {
                 wss.clients.forEach((client) => {
-                    if (client !== ws && client.readyState === 1) client.send(messageString);
+                    if (client !== ws && client.readyState === 1) {
+                        client.send(messageString);
+                    }
                 });
             }
         } catch (e) {
+            // إعادة توجيه الصور (Binary)
             wss.clients.forEach((client) => {
-                if (client !== ws && client.readyState === 1) client.send(data);
+                if (client !== ws && client.readyState === 1) {
+                    client.send(data);
+                }
             });
         }
     });
 });
 
 const port = process.env.PORT || 3000;
-server.listen(port, () => console.log(`Server running on port ${port}`));
+server.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
+});
