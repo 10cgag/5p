@@ -1,29 +1,67 @@
-<script>
-    const ws = new WebSocket(`wss://${window.location.host}`);
-    const img = document.getElementById('screenDisplay');
-    const hiddenInput = document.getElementById('hiddenInput');
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Remote Control</title>
+    <style>
+        body { margin: 0; background: #000; height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        #screenDisplay { max-width: 100vw; max-height: 100vh; object-fit: contain; cursor: crosshair; }
+        #hiddenInput { position: absolute; top: -100px; opacity: 0; }
+    </style>
+</head>
+<body>
+    <input type="text" id="hiddenInput">
+    <img id="screenDisplay" alt="Waiting for stream..." />
+    
+    <script>
+        // استخدام بروتوكول wss الصحيح
+        const ws = new WebSocket(`wss://${window.location.host}`);
+        const img = document.getElementById('screenDisplay');
+        const hiddenInput = document.getElementById('hiddenInput');
 
-    let typingTimer;
-    hiddenInput.addEventListener('input', (e) => {
-        clearTimeout(typingTimer);
-        typingTimer = setTimeout(() => {
-            if (e.target.value.length > 0) {
-                ws.send(JSON.stringify({ type: 'text', value: e.target.value }));
-                hiddenInput.value = ""; 
+        // الحفاظ على تركيز الحقل للكتابة
+        document.body.addEventListener('click', () => hiddenInput.focus());
+
+        // استقبال البيانات
+        ws.onmessage = (event) => {
+            if (event.data instanceof Blob) {
+                // استخدام FileReader لتحويل Blob لبيانات يمكن عرضها
+                const reader = new FileReader();
+                reader.onload = () => {
+                    img.src = reader.result;
+                };
+                reader.readAsDataURL(event.data);
+            } else {
+                console.log("Received data:", event.data);
             }
-        }, 300);
-    });
+        };
 
-    img.addEventListener('click', (e) => {
-        const rect = img.getBoundingClientRect();
-        ws.send(JSON.stringify({ type: 'touch', x: (e.clientX - rect.left)/rect.width, y: (e.clientY - rect.top)/rect.height }));
-    });
+        // إرسال اللمس
+        img.addEventListener('click', (e) => {
+            const rect = img.getBoundingClientRect();
+            const data = { 
+                type: 'touch', 
+                x: (e.clientX - rect.left) / rect.width, 
+                y: (e.clientY - rect.top) / rect.height 
+            };
+            ws.send(JSON.stringify(data));
+        });
 
-    ws.onmessage = (event) => {
-        if (event.data instanceof Blob) {
-            const url = URL.createObjectURL(event.data);
-            img.src = url;
-            img.onload = () => URL.revokeObjectURL(url);
-        }
-    };
-</script>
+        // إرسال النص
+        let typingTimer;
+        hiddenInput.addEventListener('input', (e) => {
+            clearTimeout(typingTimer);
+            typingTimer = setTimeout(() => {
+                if (e.target.value) {
+                    ws.send(JSON.stringify({ type: 'text', value: e.target.value }));
+                    e.target.value = "";
+                }
+            }, 300);
+        });
+
+        ws.onerror = (err) => console.error("WebSocket Error:", err);
+        ws.onopen = () => console.log("Connected to stream");
+    </script>
+</body>
+</html>
