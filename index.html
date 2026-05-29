@@ -1,56 +1,29 @@
-<!DOCTYPE html>
-<html lang="ar">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Remote Control</title>
-    <style>
-        body { margin: 0; background: #000; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
-        #screenDisplay { flex-grow: 1; width: 100vw; object-fit: contain; cursor: crosshair; }
-        #hiddenInput { position: absolute; top: -100px; }
-    </style>
-</head>
-<body>
-    <input type="text" id="hiddenInput">
-    <img id="screenDisplay" />
-    
-    <script>
-        const ws = new WebSocket(`wss://${window.location.host}`);
-        const img = document.getElementById('screenDisplay');
-        const hiddenInput = document.getElementById('hiddenInput');
+<script>
+    const ws = new WebSocket(`wss://${window.location.host}`);
+    const img = document.getElementById('screenDisplay');
+    const hiddenInput = document.getElementById('hiddenInput');
 
-        // 1. عند اللمس على الشاشة، اجعل التركيز على الحقل المخفي للكتابة
-        document.body.addEventListener('click', () => {
-            hiddenInput.focus();
-        });
-
-        // 2. إرسال النص بمجرد الكتابة
-        hiddenInput.addEventListener('input', (e) => {
+    let typingTimer;
+    hiddenInput.addEventListener('input', (e) => {
+        clearTimeout(typingTimer);
+        typingTimer = setTimeout(() => {
             if (e.target.value.length > 0) {
                 ws.send(JSON.stringify({ type: 'text', value: e.target.value }));
                 hiddenInput.value = ""; 
             }
-        });
+        }, 300);
+    });
 
-        // 3. إرسال اللمس (إحداثيات دقيقة)
-        img.addEventListener('click', (e) => {
-            const rect = img.getBoundingClientRect();
-            const data = { 
-                type: 'touch', 
-                x: (e.clientX - rect.left) / rect.width, 
-                y: (e.clientY - rect.top) / rect.height 
-            };
-            ws.send(JSON.stringify(data));
-        });
+    img.addEventListener('click', (e) => {
+        const rect = img.getBoundingClientRect();
+        ws.send(JSON.stringify({ type: 'touch', x: (e.clientX - rect.left)/rect.width, y: (e.clientY - rect.top)/rect.height }));
+    });
 
-        // 4. استقبال الصور
-        ws.onmessage = (event) => {
-            if (event.data instanceof Blob) {
-                const url = URL.createObjectURL(event.data);
-                img.src = url;
-                img.onload = () => URL.revokeObjectURL(url);
-            }
-        };
-    </script>
-</body>
-</html>
+    ws.onmessage = (event) => {
+        if (event.data instanceof Blob) {
+            const url = URL.createObjectURL(event.data);
+            img.src = url;
+            img.onload = () => URL.revokeObjectURL(url);
+        }
+    };
+</script>
