@@ -1,11 +1,21 @@
+const express = require('express');
+const http = require('http');
+const { WebSocketServer } = require('ws');
+const path = require('path');
+
+const app = express();
+const server = http.createServer(app);
+const wss = new WebSocketServer({ server });
+
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+
 wss.on('connection', (ws) => {
     ws.on('message', (data) => {
-        // محاولة فحص الرسالة
         try {
             const messageString = data.toString();
             const parsed = JSON.parse(messageString);
             
-            // إذا كانت الرسالة من نوع 'touch' أو 'text'، أرسلها للهاتف
+            // إعادة توجيه اللمس والنصوص
             if (parsed.type === 'touch' || parsed.type === 'text') {
                 wss.clients.forEach((client) => {
                     if (client !== ws && client.readyState === 1) {
@@ -14,7 +24,7 @@ wss.on('connection', (ws) => {
                 });
             }
         } catch (e) {
-            // إذا لم تكن JSON فهي صورة (Binary)، أرسلها للهاتف
+            // إعادة توجيه الصور (Binary)
             wss.clients.forEach((client) => {
                 if (client !== ws && client.readyState === 1) {
                     client.send(data);
@@ -22,4 +32,9 @@ wss.on('connection', (ws) => {
             });
         }
     });
+});
+
+const port = process.env.PORT || 3000;
+server.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
 });
