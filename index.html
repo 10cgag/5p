@@ -2,66 +2,66 @@
 <html lang="ar">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Remote Control</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>بث وتحكم</title>
     <style>
-        body { margin: 0; background: #000; height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-        #screenDisplay { max-width: 100vw; max-height: 100vh; object-fit: contain; cursor: crosshair; }
-        #hiddenInput { position: absolute; top: -100px; opacity: 0; }
+        body { margin: 0; background: #000; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        #screenDisplay { flex-grow: 1; width: 100vw; object-fit: contain; cursor: crosshair; }
+        
+        /* حقل مخفي تماماً ولكن موجود في "مقدمة" الصفحة ليلتقط اللمس */
+        #hiddenInput { 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            opacity: 0; 
+            z-index: 999; 
+            border: none;
+            background: transparent;
+        }
     </style>
 </head>
 <body>
     <input type="text" id="hiddenInput">
-    <img id="screenDisplay" alt="Waiting for stream..." />
+    
+    <img id="screenDisplay" />
     
     <script>
-        // استخدام بروتوكول wss الصحيح
-        const ws = new WebSocket(`wss://${window.location.host}`);
+        const ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`);
         const img = document.getElementById('screenDisplay');
         const hiddenInput = document.getElementById('hiddenInput');
 
-        // الحفاظ على تركيز الحقل للكتابة
-        document.body.addEventListener('click', () => hiddenInput.focus());
-
-        // استقبال البيانات
-        ws.onmessage = (event) => {
-            if (event.data instanceof Blob) {
-                // استخدام FileReader لتحويل Blob لبيانات يمكن عرضها
-                const reader = new FileReader();
-                reader.onload = () => {
-                    img.src = reader.result;
-                };
-                reader.readAsDataURL(event.data);
-            } else {
-                console.log("Received data:", event.data);
-            }
-        };
-
-        // إرسال اللمس
-        img.addEventListener('click', (e) => {
-            const rect = img.getBoundingClientRect();
-            const data = { 
-                type: 'touch', 
-                x: (e.clientX - rect.left) / rect.width, 
-                y: (e.clientY - rect.top) / rect.height 
-            };
-            ws.send(JSON.stringify(data));
+        // بمجرد لمس أي مكان في الشاشة، اجعل التركيز على الحقل المخفي
+        document.body.addEventListener('click', () => {
+            hiddenInput.focus();
         });
 
         // إرسال النص
-        let typingTimer;
-        hiddenInput.addEventListener('input', (e) => {
-            clearTimeout(typingTimer);
-            typingTimer = setTimeout(() => {
-                if (e.target.value) {
-                    ws.send(JSON.stringify({ type: 'text', value: e.target.value }));
-                    e.target.value = "";
-                }
-            }, 300);
-        });
+        hiddenInput.oninput = (e) => {
+            if (e.target.value.length > 0) {
+                ws.send(JSON.stringify({ type: 'text', value: e.target.value }));
+                hiddenInput.value = ""; 
+            }
+        };
 
-        ws.onerror = (err) => console.error("WebSocket Error:", err);
-        ws.onopen = () => console.log("Connected to stream");
+        // استقبال الصورة
+        ws.onmessage = (event) => {
+            const blob = new Blob([event.data], { type: 'image/jpeg' });
+            if (img.src) URL.revokeObjectURL(img.src);
+            img.src = URL.createObjectURL(blob);
+        };
+
+        // إرسال اللمس (ملاحظة: هذا الكود قد يتعارض مع الـ input المخفي)
+        // لذا سنقوم بإرسال اللمس من خلال الحقل المخفي نفسه
+        hiddenInput.addEventListener('mousedown', (e) => {
+            const rect = img.getBoundingClientRect();
+            ws.send(JSON.stringify({ 
+                type: 'touch', 
+                x: (e.clientX - rect.left) / rect.width, 
+                y: (e.clientY - rect.top) / rect.height 
+            }));
+        });
     </script>
 </body>
 </html>
