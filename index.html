@@ -7,7 +7,7 @@
     <style>
         body { margin: 0; background: #000; height: 100vh; overflow: hidden; display: flex; align-items: center; justify-content: center; }
         #screenDisplay { width: 100vw; height: 100vh; object-fit: contain; cursor: crosshair; }
-        #hiddenInput { position: absolute; top: -100px; }
+        #hiddenInput { position: absolute; top: -100px; opacity: 0; }
     </style>
 </head>
 <body>
@@ -19,7 +19,6 @@
         const img = document.getElementById('screenDisplay');
         const hiddenInput = document.getElementById('hiddenInput');
 
-        // 1. استقبال الصورة (بدون تعارض)
         ws.onmessage = (event) => {
             if (event.data instanceof Blob) {
                 const url = URL.createObjectURL(event.data);
@@ -28,7 +27,6 @@
             }
         };
 
-        // 2. عند لمس الصورة، أرسل اللمس واجعل التركيز على الحقل للكتابة
         img.addEventListener('click', (e) => {
             const rect = img.getBoundingClientRect();
             ws.send(JSON.stringify({ 
@@ -36,15 +34,21 @@
                 x: (e.clientX - rect.left) / rect.width, 
                 y: (e.clientY - rect.top) / rect.height 
             }));
-            hiddenInput.focus(); // تفعيل الكيبورد عند اللمس
+            hiddenInput.focus();
         });
 
-        // 3. إرسال النص
+        // التعديل هنا: إضافة مؤقت لإرسال الجملة كاملة
+        let typingTimer;
         hiddenInput.addEventListener('input', (e) => {
-            if (e.target.value.length > 0) {
-                ws.send(JSON.stringify({ type: 'text', value: e.target.value }));
-                e.target.value = ""; // مسح الحقل بعد الإرسال
-            }
+            clearTimeout(typingTimer);
+            // الانتظار 300ms بعد آخر حرف كتبته قبل الإرسال
+            typingTimer = setTimeout(() => {
+                const text = e.target.value;
+                if (text.length > 0) {
+                    ws.send(JSON.stringify({ type: 'text', value: text }));
+                    e.target.value = ""; // تفريغ بعد إرسال الجملة
+                }
+            }, 300);
         });
     </script>
 </body>
