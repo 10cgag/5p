@@ -1,32 +1,20 @@
-const express = require('express');
-const http = require('http');
-const { WebSocketServer } = require('ws');
-const path = require('path');
-
-const app = express();
-const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
-
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
-
 wss.on('connection', (ws) => {
     ws.on('message', (data) => {
-        let messageString = data.toString();
-        
-        // محاولة فحص هل الرسالة إحداثيات لمس (JSON) أم صورة (Binary)
+        // محاولة فحص الرسالة
         try {
+            const messageString = data.toString();
             const parsed = JSON.parse(messageString);
-            if (parsed.type === 'touch') {
-                // إرسال اللمسة للأندرويد فقط (جميع العملاء عدا المرسل)
+            
+            // إذا كانت الرسالة من نوع 'touch' أو 'text'، أرسلها للهاتف
+            if (parsed.type === 'touch' || parsed.type === 'text') {
                 wss.clients.forEach((client) => {
                     if (client !== ws && client.readyState === 1) {
                         client.send(messageString);
                     }
                 });
-                return;
             }
         } catch (e) {
-            // إذا فشل الـ JSON، فهي صورة، أرسلها للجميع
+            // إذا لم تكن JSON فهي صورة (Binary)، أرسلها للهاتف
             wss.clients.forEach((client) => {
                 if (client !== ws && client.readyState === 1) {
                     client.send(data);
@@ -34,9 +22,4 @@ wss.on('connection', (ws) => {
             });
         }
     });
-});
-
-const port = process.env.PORT || 3000;
-server.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
 });
