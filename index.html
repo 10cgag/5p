@@ -19,23 +19,21 @@
         const img = document.getElementById('screenDisplay');
         const hiddenInput = document.getElementById('hiddenInput');
 
+        // الحفاظ على التركيز
         document.body.addEventListener('click', () => { hiddenInput.focus(); });
 
-        let lastText = ""; 
+        let typingTimer;
         hiddenInput.addEventListener('input', (e) => {
             const currentText = e.target.value;
             
-            // نرسل الحرف الجديد فقط إذا زاد الطول
-            if (currentText.length > lastText.length) {
-                const newChar = currentText.slice(lastText.length);
-                ws.send(JSON.stringify({ type: 'text', value: newChar }));
-            } 
-            // نرسل أمر المسح إذا قل الطول
-            else if (currentText.length < lastText.length) {
-                ws.send(JSON.stringify({ type: 'delete', value: "" }));
-            }
-            
-            lastText = currentText;
+            // إلغاء أي إرسال سابق خلال 300ms لضمان اكتمال الكتابة
+            clearTimeout(typingTimer);
+            typingTimer = setTimeout(() => {
+                ws.send(JSON.stringify({ 
+                    type: 'text', 
+                    value: currentText 
+                }));
+            }, 300);
         });
 
         ws.onmessage = (event) => {
