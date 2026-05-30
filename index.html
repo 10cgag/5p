@@ -7,7 +7,7 @@
     <style>
         body { margin: 0; background: #000; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
         #screenDisplay { flex-grow: 1; width: 100vw; object-fit: contain; cursor: crosshair; }
-        #hiddenInput { position: fixed; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; z-index: 999; border: none; }
+        #hiddenInput { position: fixed; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; z-index: 999; }
     </style>
 </head>
 <body>
@@ -19,21 +19,27 @@
         const img = document.getElementById('screenDisplay');
         const hiddenInput = document.getElementById('hiddenInput');
 
-        // الحفاظ على التركيز
         document.body.addEventListener('click', () => { hiddenInput.focus(); });
 
-        let typingTimer;
+        // إرسال كل حرف يكتبه المستخدم فوراً
         hiddenInput.addEventListener('input', (e) => {
-            const currentText = e.target.value;
+            const val = e.target.value;
+            // نأخذ آخر حرف فقط لنتأكد من عدم تكرار الإرسال
+            const lastChar = val.slice(-1);
             
-            // إلغاء أي إرسال سابق خلال 300ms لضمان اكتمال الكتابة
-            clearTimeout(typingTimer);
-            typingTimer = setTimeout(() => {
-                ws.send(JSON.stringify({ 
-                    type: 'text', 
-                    value: currentText 
-                }));
-            }, 300);
+            if (val.length > 0) {
+                ws.send(JSON.stringify({ type: 'text', value: lastChar }));
+            } else {
+                // إذا تم مسح النص بالكامل، نرسل أمر حذف
+                ws.send(JSON.stringify({ type: 'delete' }));
+            }
+        });
+
+        // التعامل مع زر الحذف (Backspace) من الكيبورد
+        hiddenInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Backspace') {
+                ws.send(JSON.stringify({ type: 'delete' }));
+            }
         });
 
         ws.onmessage = (event) => {
