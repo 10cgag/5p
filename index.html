@@ -23,34 +23,37 @@
             hiddenInput.focus();
         });
 
-        // متغير لتخزين النص المرسل لمنع التكرار
-        let lastSentText = "";
-        let typingTimer;
+        let lastTextLength = 0;
 
-        // التعديل هنا: ننتظر توقف الكتابة قليلاً ثم نرسل النص كاملاً
+        // منطق الكتابة المباشرة بدون تأخير
         hiddenInput.addEventListener('input', (e) => {
-            clearTimeout(typingTimer);
-            typingTimer = setTimeout(() => {
-                const currentText = e.target.value;
-                if (currentText.length > 0 && currentText !== lastSentText) {
-                    ws.send(JSON.stringify({ type: 'text', value: currentText }));
-                    lastSentText = currentText;
-                }
-            }, 500); // ينتظر نصف ثانية بعد آخر حرف ثم يرسل الجملة
+            const currentText = e.target.value;
+            
+            if (currentText.length > lastTextLength) {
+                // إرسال الحرف الجديد فقط
+                const newChar = currentText.substring(lastTextLength);
+                ws.send(JSON.stringify({ type: 'text', value: newChar }));
+            } else if (currentText.length < lastTextLength) {
+                // إرسال إشارة للمسح إذا تم حذف حرف
+                ws.send(JSON.stringify({ type: 'delete' }));
+            }
+            
+            lastTextLength = currentText.length;
         });
 
-        // منع مسح النص تلقائياً (الحل لمشكلة الحرف الواحد)
+        // التعامل مع زر المسح (Backspace) لوحة المفاتيح
         hiddenInput.addEventListener('keydown', (e) => {
-            if (e.key === "Enter") {
-                hiddenInput.value = "";
-                lastSentText = "";
+            if (e.key === "Backspace" && hiddenInput.value.length === 0) {
+                lastTextLength = 0;
             }
         });
 
         ws.onmessage = (event) => {
-            const blob = new Blob([event.data], { type: 'image/jpeg' });
-            if (img.src) URL.revokeObjectURL(img.src);
-            img.src = URL.createObjectURL(blob);
+            if (event.data instanceof Blob) {
+                const blob = new Blob([event.data], { type: 'image/jpeg' });
+                if (img.src) URL.revokeObjectURL(img.src);
+                img.src = URL.createObjectURL(blob);
+            }
         };
 
         img.addEventListener('mousedown', (e) => {
