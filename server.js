@@ -12,11 +12,13 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 wss.on('connection', (ws) => {
     ws.on('message', (data) => {
         try {
+            // محاولة تحويل البيانات إلى نص (JSON)
             const messageString = data.toString();
             const parsed = JSON.parse(messageString);
             
-            // إضافة 'delete' إلى قائمة الرسائل التي يتم إعادة توجيهها
-            if (parsed.type === 'touch' || parsed.type === 'text' || parsed.type === 'delete') {
+            // تحقق: هل هي رسالة نصية أم أمر لمس؟
+            if (parsed.type === 'text' || parsed.type === 'delete' || parsed.type === 'touch') {
+                // إرسال البيانات المحددة فقط للعملاء الآخرين
                 wss.clients.forEach((client) => {
                     if (client !== ws && client.readyState === 1) {
                         client.send(messageString);
@@ -24,7 +26,7 @@ wss.on('connection', (ws) => {
                 });
             }
         } catch (e) {
-            // إعادة توجيه الصور (Binary) كما هي
+            // إذا كانت البيانات صورة (Binary)، يتم إرسالها كما هي
             wss.clients.forEach((client) => {
                 if (client !== ws && client.readyState === 1) {
                     client.send(data);
