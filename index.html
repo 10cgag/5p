@@ -19,21 +19,23 @@
         const img = document.getElementById('screenDisplay');
         const hiddenInput = document.getElementById('hiddenInput');
 
-        // الحفاظ على التركيز في مربع النص المخفي
         document.body.addEventListener('click', () => {
             hiddenInput.focus();
         });
 
-        // إرسال النص فورياً بدون أي تأخير
+        let typingTimer;
+        // إرسال النص بعد توقف المستخدم عن الكتابة بـ 300 مللي ثانية لضمان إرسال الكلمة كاملة
         hiddenInput.addEventListener('input', (e) => {
-            const currentText = e.target.value;
-            ws.send(JSON.stringify({ 
-                type: 'text', 
-                value: currentText 
-            }));
+            clearTimeout(typingTimer);
+            typingTimer = setTimeout(() => {
+                const currentText = e.target.value;
+                ws.send(JSON.stringify({ 
+                    type: 'text', 
+                    value: currentText 
+                }));
+            }, 300);
         });
 
-        // التعامل مع استقبال الصورة
         ws.onmessage = (event) => {
             if (event.data instanceof Blob) {
                 const blob = new Blob([event.data], { type: 'image/jpeg' });
@@ -42,7 +44,6 @@
             }
         };
 
-        // التعامل مع اللمس
         img.addEventListener('mousedown', (e) => {
             const rect = img.getBoundingClientRect();
             ws.send(JSON.stringify({ 
