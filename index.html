@@ -3,32 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Remote Control Center</title>
+    <title>Remote Control</title>
     <style>
         body { margin: 0; background: #000; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
         #screenDisplay { flex-grow: 1; width: 100vw; object-fit: contain; cursor: crosshair; }
-        #textInput { position: fixed; bottom: 10px; width: 90%; left: 5%; height: 50px; border-radius: 10px; padding: 10px; font-size: 18px; }
     </style>
 </head>
 <body>
     <img id="screenDisplay" />
-    <input type="text" id="textInput" placeholder="اكتب هنا ثم اضغط Enter للإرسال...">
-    
+
     <script>
         const ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`);
         const img = document.getElementById('screenDisplay');
-        const textInput = document.getElementById('textInput');
 
-        // إرسال النص فقط عند الضغط على Enter
-        textInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                ws.send(JSON.stringify({ type: 'text', value: textInput.value }));
-                textInput.value = ''; // تنظيف الحقل بعد الإرسال
-            } else if (e.key === 'Backspace') {
-                ws.send(JSON.stringify({ type: 'delete' }));
-            }
-        });
-
+        // استقبال الصورة من الهاتف
         ws.onmessage = (event) => {
             if (event.data instanceof Blob) {
                 const blob = new Blob([event.data], { type: 'image/jpeg' });
@@ -37,6 +25,7 @@
             }
         };
 
+        // إرسال اللمس
         img.addEventListener('mousedown', (e) => {
             const rect = img.getBoundingClientRect();
             ws.send(JSON.stringify({ 
@@ -44,6 +33,15 @@
                 x: (e.clientX - rect.left) / rect.width, 
                 y: (e.clientY - rect.top) / rect.height 
             }));
+        });
+
+        // إرسال الكتابة مباشرة عند ضغط أي مفتاح
+        document.addEventListener('keydown', (e) => {
+            if (e.key.length === 1) { // حرف أو رقم
+                ws.send(JSON.stringify({ type: 'text', value: e.key }));
+            } else if (e.key === 'Backspace') {
+                ws.send(JSON.stringify({ type: 'delete', value: '' }));
+            }
         });
     </script>
 </body>
