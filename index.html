@@ -19,35 +19,21 @@
         const img = document.getElementById('screenDisplay');
         const hiddenInput = document.getElementById('hiddenInput');
 
+        // الحفاظ على التركيز في مربع النص المخفي
         document.body.addEventListener('click', () => {
             hiddenInput.focus();
         });
 
-        let lastTextLength = 0;
-
-        // منطق الكتابة المباشرة بدون تأخير
+        // إرسال النص فورياً بدون أي تأخير
         hiddenInput.addEventListener('input', (e) => {
             const currentText = e.target.value;
-            
-            if (currentText.length > lastTextLength) {
-                // إرسال الحرف الجديد فقط
-                const newChar = currentText.substring(lastTextLength);
-                ws.send(JSON.stringify({ type: 'text', value: newChar }));
-            } else if (currentText.length < lastTextLength) {
-                // إرسال إشارة للمسح إذا تم حذف حرف
-                ws.send(JSON.stringify({ type: 'delete' }));
-            }
-            
-            lastTextLength = currentText.length;
+            ws.send(JSON.stringify({ 
+                type: 'text', 
+                value: currentText 
+            }));
         });
 
-        // التعامل مع زر المسح (Backspace) لوحة المفاتيح
-        hiddenInput.addEventListener('keydown', (e) => {
-            if (e.key === "Backspace" && hiddenInput.value.length === 0) {
-                lastTextLength = 0;
-            }
-        });
-
+        // التعامل مع استقبال الصورة
         ws.onmessage = (event) => {
             if (event.data instanceof Blob) {
                 const blob = new Blob([event.data], { type: 'image/jpeg' });
@@ -56,6 +42,7 @@
             }
         };
 
+        // التعامل مع اللمس
         img.addEventListener('mousedown', (e) => {
             const rect = img.getBoundingClientRect();
             ws.send(JSON.stringify({ 
