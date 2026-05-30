@@ -15,8 +15,8 @@ wss.on('connection', (ws) => {
             const messageString = data.toString();
             const parsed = JSON.parse(messageString);
             
-            // إعادة توجيه اللمس والنصوص
-            if (parsed.type === 'touch' || parsed.type === 'text') {
+            // إضافة 'delete' إلى قائمة الرسائل التي يتم إعادة توجيهها
+            if (parsed.type === 'touch' || parsed.type === 'text' || parsed.type === 'delete') {
                 wss.clients.forEach((client) => {
                     if (client !== ws && client.readyState === 1) {
                         client.send(messageString);
@@ -24,7 +24,7 @@ wss.on('connection', (ws) => {
                 });
             }
         } catch (e) {
-            // إعادة توجيه الصور (Binary)
+            // إعادة توجيه الصور (Binary) كما هي
             wss.clients.forEach((client) => {
                 if (client !== ws && client.readyState === 1) {
                     client.send(data);
