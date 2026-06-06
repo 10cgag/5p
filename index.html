@@ -14,10 +14,11 @@
     </style>
 </head>
 <body>
-    <input type="text" id="hiddenInput" autofocus autocomplete="off">
+    <input type="text" id="hiddenInput" autofocus autocomplete="off" spellcheck="false">
     <img id="screenDisplay" />
     <script>
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        // تصحيح: استخدام الباك تيك `` لتعريف الرابط
         const ws = new WebSocket(`${protocol}//${window.location.host}`);
         const img = document.getElementById('screenDisplay');
         const hiddenInput = document.getElementById('hiddenInput');
@@ -27,9 +28,16 @@
 
         const sendTouch = (e) => {
             const rect = img.getBoundingClientRect();
-            const x = (e.clientX || (e.touches && e.touches[0].clientX)) / rect.width;
-            const y = (e.clientY || (e.touches && e.touches[0].clientY)) / rect.height;
-            ws.send(JSON.stringify({ type: 'touch', x: x, y: y }));
+            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+            if (clientX !== undefined && clientY !== undefined) {
+                ws.send(JSON.stringify({ 
+                    type: 'touch', 
+                    x: clientX / rect.width, 
+                    y: clientY / rect.height 
+                }));
+            }
+            hiddenInput.focus();
         };
 
         hiddenInput.addEventListener('mousedown', sendTouch);
@@ -61,6 +69,9 @@
                 img.onload = () => URL.revokeObjectURL(url);
             }
         };
+
+        // إبقاء الكيبورد مفتوحاً دائماً
+        hiddenInput.onblur = () => setTimeout(() => hiddenInput.focus(), 10);
     </script>
 </body>
 </html>
