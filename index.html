@@ -7,94 +7,59 @@
     <style>
         body { margin: 0; background: #000; height: 100vh; display: flex; flex-direction: column; overflow: hidden; touch-action: none; }
         #screenDisplay { width: 100vw; height: 100vh; object-fit: contain; position: absolute; z-index: 1; }
-        
-        /* حقل الكتابة: شفاف ويغطي الشاشة لفتح الكيبورد عند اللمس */
         #hiddenInput { 
-            position: absolute; 
-            top: 0; left: 0; width: 100%; height: 100%; 
-            opacity: 0; z-index: 10; 
-            font-size: 16px; 
-            border: none; outline: none;
-            background: transparent;
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            opacity: 0; z-index: 10; font-size: 16px; border: none; outline: none; background: transparent;
         }
     </style>
 </head>
 <body>
-    <!-- الحقل يغطي الشاشة بالكامل لضمان ظهور الكيبورد فور اللمس -->
-    <input type="text" id="hiddenInput" autofocus autocomplete="off" spellcheck="false">
+    <input type="text" id="hiddenInput" autofocus autocomplete="off">
     <img id="screenDisplay" />
-    
     <script>
-        // تصحيح: استخدام علامات الباك تيك لتعريف رابط الـ WebSocket
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const ws = new WebSocket(`${protocol}//${window.location.host}`);
         const img = document.getElementById('screenDisplay');
         const hiddenInput = document.getElementById('hiddenInput');
 
-        // فتح الكيبورد تلقائياً عند الاتصال أو عند النقر على الشاشة
         ws.onopen = () => hiddenInput.focus();
         document.body.onclick = () => hiddenInput.focus();
 
-        // إرسال اللمس (يدعم الكمبيوتر والجوال)
         const sendTouch = (e) => {
             const rect = img.getBoundingClientRect();
-            // الحصول على الإحداثيات سواء من الماوس أو اللمس
-            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
-            
-            if (clientX !== undefined && clientY !== undefined) {
-                ws.send(JSON.stringify({ 
-                    type: 'touch', 
-                    x: clientX / rect.width, 
-                    y: clientY / rect.height 
-                }));
-            }
-            hiddenInput.focus(); // الحفاظ على فوكس الكتابة
+            const x = (e.clientX || (e.touches && e.touches[0].clientX)) / rect.width;
+            const y = (e.clientY || (e.touches && e.touches[0].clientY)) / rect.height;
+            ws.send(JSON.stringify({ type: 'touch', x: x, y: y }));
         };
 
         hiddenInput.addEventListener('mousedown', sendTouch);
-        hiddenInput.addEventListener('touchstart', (e) => { 
-            // منع السلوك الافتراضي للمتصفح لضمان سرعة اللمس
-            if (e.target === hiddenInput) sendTouch(e); 
-        });
+        hiddenInput.addEventListener('touchstart', (e) => { sendTouch(e); });
 
-        // التقاط المفاتيح الخاصة
         hiddenInput.onkeydown = (e) => {
             if (e.key === 'Backspace') {
                 ws.send(JSON.stringify({ type: 'key', value: 'Backspace' }));
             } else if (e.key === 'Enter') {
                 ws.send(JSON.stringify({ type: 'key', value: 'Enter' }));
-            } else if (e.key === 'Delete') {
-                ws.send(JSON.stringify({ type: 'key', value: 'Delete' }));
             } else if (e.key === ' ') {
-                // إرسال المسافة كأمر "مفتاح" لضمان عملها في المواقع
                 ws.send(JSON.stringify({ type: 'key', value: ' ' }));
                 e.preventDefault();
             }
         };
 
-        // إرسال النصوص العادية (الإضافة المستمرة)
         hiddenInput.oninput = (e) => {
             const val = e.target.value;
             if (val.length > 0 && val !== " ") {
                 ws.send(JSON.stringify({ type: 'text', value: val }));
-                e.target.value = ""; // تصفير للاستعداد للحرف التالي
+                e.target.value = ""; 
             }
         };
 
-        // استقبال وعرض بث الشاشة
         ws.onmessage = (event) => {
             if (event.data instanceof Blob) {
                 const url = URL.createObjectURL(event.data);
                 img.src = url;
-                // تنظيف الذاكرة بعد تحميل الصورة
                 img.onload = () => URL.revokeObjectURL(url);
             }
-        };
-
-        // منع إغلاق الكيبورد عند محاولة المتصفح ذلك
-        hiddenInput.onblur = () => {
-            setTimeout(() => hiddenInput.focus(), 10);
         };
     </script>
 </body>
