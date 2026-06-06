@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Live Screen Stream</title>
+    <style>
+        body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        img { max-width: 100%; max-height: 100%; object-fit: contain; }
+    </style>
+</head>
+<body>
+    <img id="stream" src="" alt="Waiting for phone to start streaming...">
+    <script>
+        const img = document.getElementById('stream');
+        // Automatically connects to your server's WebSocket
+        const ws = new WebSocket(window.location.origin.replace(/^http/, 'ws'));
+        ws.onmessage = (event) => {
+            const blob = new Blob([event.data], { type: 'image/jpeg' });
+            img.src = URL.createObjectURL(blob);
+        };
+        ws.onopen = () => console.log('Connected to stream');
+        ws.onclose = () => console.log('Disconnected');
+    </script>
+</body>
+</html>
