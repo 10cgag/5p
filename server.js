@@ -15,8 +15,8 @@ wss.on('connection', (ws) => {
             const messageString = data.toString();
             const parsed = JSON.parse(messageString);
             
-            // تعديل: أضفنا 'key' لضمان إرسال أوامر المسح والمسافة والإدخال للهاتف
-            if (parsed.type === 'touch' || parsed.type === 'text' || parsed.type === 'key') {
+            // إعادة توجيه اللمس والنصوص
+            if (parsed.type === 'touch' || parsed.type === 'text') {
                 wss.clients.forEach((client) => {
                     if (client !== ws && client.readyState === 1) {
                         client.send(messageString);
@@ -24,7 +24,7 @@ wss.on('connection', (ws) => {
                 });
             }
         } catch (e) {
-            // إعادة توجيه الصور (Binary) كما هي لتظهر على الشاشة
+            // إعادة توجيه الصور (Binary)
             wss.clients.forEach((client) => {
                 if (client !== ws && client.readyState === 1) {
                     client.send(data);
@@ -36,6 +36,5 @@ wss.on('connection', (ws) => {
 
 const port = process.env.PORT || 3000;
 server.listen(port, () => {
-    // تصحيح: إضافة علامات `` ليعمل المتغير port بشكل صحيح
     console.log(`Server is running on port ${port}`);
 });
