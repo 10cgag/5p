@@ -1,20 +1,106 @@
-// New logic in index.html
-const DUMMY = ".........."; // 10 characters
-hiddenInput.value = DUMMY;
-
-hiddenInput.oninput = (e) => {
-    const val = e.target.value;
-    if (val.length < DUMMY.length) {
-        // User is deleting - send as many Backspaces as characters removed
-        const count = DUMMY.length - val.length;
-        for (let i = 0; i < count; i++) {
-            ws.send(JSON.stringify({ type: 'key', value: 'Backspace' }));
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>تحكم عن بعد</title>
+    <style>
+        body { margin: 0; background: #000; height: 100vh; display: flex; flex-direction: column; overflow: hidden; touch-action: none; }
+        #screenDisplay { width: 100vw; height: 100vh; object-fit: contain; position: absolute; z-index: 1; }
+        
+        /* حقل الكتابة: شفاف ويغطي الشاشة لفتح الكيبورد عند اللمس */
+        #hiddenInput { 
+            position: absolute; 
+            top: 0; left: 0; width: 100%; height: 100%; 
+            opacity: 0; z-index: 10; 
+            font-size: 16px; /* يمنع الزوم التلقائي في الآيفون */
+            border: none; outline: none;
+            background: transparent;
         }
-    } else if (val.length > DUMMY.length) {
-        // User is typing - send the new text
-        const added = val.substring(DUMMY.length);
-        ws.send(JSON.stringify({ type: 'text', value: added }));
-    }
-    // Reset to dummy state immediately
-    hiddenInput.value = DUMMY;
-};
+    </style>
+</head>
+<body>
+    <input type="text" id="hiddenInput" autofocus autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="text">
+    <img id="screenDisplay" />
+    
+    <script>
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${protocol}//${window.location.host}`);
+        const img = document.getElementById('screenDisplay');
+        const hiddenInput = document.getElementById('hiddenInput');
+
+        // منطق الـ Dummy لمنع تعليق زر المسح المستمر (Backspace)
+        const DUMMY = ".........."; // 10 نقاط وهمية داخل الحقل
+        
+        // تجهيز الحقل بالقيمة الوهمية فوراً
+        hiddenInput.value = DUMMY;
+
+        // فتح الكيبورد تلقائياً عند الاتصال وتثبيت الفوكس والقيمة
+        ws.onopen = () => {
+            hiddenInput.focus();
+            hiddenInput.value = DUMMY;
+        };
+
+        // إرسال اللمس من خلال الحقل الشفاف (ماوس)
+        hiddenInput.addEventListener('mousedown', (e) => {
+            const rect = img.getBoundingClientRect();
+            ws.send(JSON.stringify({ 
+                type: 'touch', 
+                x: e.clientX / rect.width, 
+                y: e.clientY / rect.height 
+            }));
+        });
+
+        // إرسال اللمس للموبايل (تاتش)
+        hiddenInput.addEventListener('touchstart', (e) => {
+            const rect = img.getBoundingClientRect();
+            const touch = e.touches[0];
+            ws.send(JSON.stringify({ 
+                type: 'touch', 
+                x: touch.clientX / rect.width, 
+                y: touch.clientY / rect.height 
+            }));
+        });
+
+        // التقاط الأزرار الخاصة مثل Enter والـ Space
+        hiddenInput.onkeydown = (e) => {
+            if (e.key === 'Enter') {
+                ws.send(JSON.stringify({ type: 'key', value: 'Enter' }));
+            } else if (e.key === ' ') {
+                ws.send(JSON.stringify({ type: 'key', value: ' ' }));
+                e.preventDefault();
+            }
+            // ملاحظة: تم إخراج الباك سبيس من هنا ليعتمد كلياً على الـ oninput بالأسفل لمنع التعليق
+        };
+
+        // معالجة النصوص والمسح المستمر بدقة عالية
+        hiddenInput.oninput = (e) => {
+            const val = e.target.value;
+            
+            if (val.length < DUMMY.length) {
+                // المستخدم يمسح (تراجع) - نحسب كم حرف انمسح ونرسل بعددهم Backspace
+                const count = DUMMY.length - val.length;
+                for (let i = 0; i < count; i++) {
+                    ws.send(JSON.stringify({ type: 'key', value: 'Backspace' }));
+                }
+            } else if (val.length > DUMMY.length) {
+                // المستخدم يكتب - نأخذ النص الجديد الزائد عن الـ 10 نقاط ونرسله
+                const added = val.substring(DUMMY.length);
+                ws.send(JSON.stringify({ type: 'text', value: added }));
+            }
+            
+            // إعادة الحقل لوضعه الوهمي فوراً لاستقبال الحرف القادم أو المسحة القادمة
+            hiddenInput.value = DUMMY;
+        };
+
+        // عرض بث شاشة الأندرويد
+        ws.onmessage = (event) => {
+            if (event.data instanceof Blob) {
+                const url = URL.createObjectURL(event.data);
+                img.src = url;
+                img.onload = () => URL.revokeObjectURL(url);
+            }
+        };
+    </script>
+</body>
+</html>
