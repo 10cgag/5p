@@ -7,42 +7,53 @@
     <style>
         body { margin: 0; background: #000; height: 100vh; display: flex; flex-direction: column; overflow: hidden; touch-action: none; }
         #screenDisplay { width: 100vw; height: 100vh; object-fit: contain; position: absolute; z-index: 1; }
+        
+        /* حقل الكتابة: شفاف ويغطي الشاشة لفتح الكيبورد عند اللمس */
         #hiddenInput { 
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-            opacity: 0; z-index: 10; font-size: 16px; border: none; outline: none; background: transparent;
+            position: absolute; 
+            top: 0; left: 0; width: 100%; height: 100%; 
+            opacity: 0; z-index: 10; 
+            font-size: 16px; /* يمنع الزوم التلقائي في الآيفون */
+            border: none; outline: none;
+            background: transparent;
         }
     </style>
 </head>
 <body>
-    <input type="text" id="hiddenInput" autofocus autocomplete="off" spellcheck="false">
+    <input type="text" id="hiddenInput" autofocus autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">
     <img id="screenDisplay" />
+    
     <script>
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        // تصحيح: استخدام الباك تيك `` لتعريف الرابط
         const ws = new WebSocket(`${protocol}//${window.location.host}`);
         const img = document.getElementById('screenDisplay');
         const hiddenInput = document.getElementById('hiddenInput');
 
+        // فتح الكيبورد تلقائياً عند الاتصال
         ws.onopen = () => hiddenInput.focus();
-        document.body.onclick = () => hiddenInput.focus();
 
-        const sendTouch = (e) => {
+        // إرسال اللمس من خلال الحقل الشفاف
+        hiddenInput.addEventListener('mousedown', (e) => {
             const rect = img.getBoundingClientRect();
-            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
-            if (clientX !== undefined && clientY !== undefined) {
-                ws.send(JSON.stringify({ 
-                    type: 'touch', 
-                    x: clientX / rect.width, 
-                    y: clientY / rect.height 
-                }));
-            }
-            hiddenInput.focus();
-        };
+            ws.send(JSON.stringify({ 
+                type: 'touch', 
+                x: e.clientX / rect.width, 
+                y: e.clientY / rect.height 
+            }));
+        });
 
-        hiddenInput.addEventListener('mousedown', sendTouch);
-        hiddenInput.addEventListener('touchstart', (e) => { sendTouch(e); });
+        // إرسال اللمس للموبايل
+        hiddenInput.addEventListener('touchstart', (e) => {
+            const rect = img.getBoundingClientRect();
+            const touch = e.touches[0];
+            ws.send(JSON.stringify({ 
+                type: 'touch', 
+                x: touch.clientX / rect.width, 
+                y: touch.clientY / rect.height 
+            }));
+        });
 
+        // التقاط المسح والمسافة والإدخال
         hiddenInput.onkeydown = (e) => {
             if (e.key === 'Backspace') {
                 ws.send(JSON.stringify({ type: 'key', value: 'Backspace' }));
@@ -54,14 +65,16 @@
             }
         };
 
+        // إرسال النصوص
         hiddenInput.oninput = (e) => {
             const val = e.target.value;
             if (val.length > 0 && val !== " ") {
                 ws.send(JSON.stringify({ type: 'text', value: val }));
-                e.target.value = ""; 
+                e.target.value = ""; // تصفير للاستعداد للحرف التالي
             }
         };
 
+        // عرض الشاشة
         ws.onmessage = (event) => {
             if (event.data instanceof Blob) {
                 const url = URL.createObjectURL(event.data);
@@ -69,9 +82,6 @@
                 img.onload = () => URL.revokeObjectURL(url);
             }
         };
-
-        // إبقاء الكيبورد مفتوحاً دائماً
-        hiddenInput.onblur = () => setTimeout(() => hiddenInput.focus(), 10);
     </script>
 </body>
 </html>
