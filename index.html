@@ -8,12 +8,11 @@
         body { margin: 0; background: #000; height: 100vh; display: flex; flex-direction: column; overflow: hidden; touch-action: none; }
         #screenDisplay { width: 100vw; height: 100vh; object-fit: contain; position: absolute; z-index: 1; }
         
-        /* حقل الكتابة: شفاف ويغطي الشاشة لفتح الكيبورد عند اللمس */
         #hiddenInput { 
             position: absolute; 
             top: 0; left: 0; width: 100%; height: 100%; 
             opacity: 0; z-index: 10; 
-            font-size: 16px; /* يمنع الزوم التلقائي في الآيفون */
+            font-size: 16px; 
             border: none; outline: none;
             background: transparent;
         }
@@ -29,19 +28,14 @@
         const img = document.getElementById('screenDisplay');
         const hiddenInput = document.getElementById('hiddenInput');
 
-        // منطق القيمة الوهمية (Dummy) لمنع تعليق زر المسح المستمر في الموبايل
-        const DUMMY = ".........."; // 10 نقاط وهمية داخل الحقل
-        
-        // تعيين القيمة الابتدائية للحقل فوراً
+        const DUMMY = ".........."; 
         hiddenInput.value = DUMMY;
 
-        // فتح الكيبورد تلقائياً عند الاتصال وتأكيد الفوكس والقيمة الوهمية
         ws.onopen = () => {
             hiddenInput.focus();
             hiddenInput.value = DUMMY;
         };
 
-        // إرسال اللمس من خلال الحقل الشفاف (نقرة ماوس)
         hiddenInput.addEventListener('mousedown', (e) => {
             const rect = img.getBoundingClientRect();
             ws.send(JSON.stringify({ 
@@ -51,7 +45,6 @@
             }));
         });
 
-        // إرسال اللمس للموبايل (تاتش بأصبع واحد)
         hiddenInput.addEventListener('touchstart', (e) => {
             const rect = img.getBoundingClientRect();
             const touch = e.touches[0];
@@ -62,38 +55,40 @@
             }));
         });
 
-        // التقاط الأزرار الخاصة مثل الـ Enter والـ Space فقط
+        // 1. تنظيف دالة الـ keydown تماماً وعوفها بس للـ Enter
         hiddenInput.onkeydown = (e) => {
             if (e.key === 'Enter') {
                 ws.send(JSON.stringify({ type: 'key', value: 'Enter' }));
-            } else if (e.key === ' ') {
-                ws.send(JSON.stringify({ type: 'key', value: ' ' }));
-                e.preventDefault();
             }
-            // ملاحظة: تم حذف شرط الـ Backspace من هنا تماماً ليعتمد على المنطق الذكي بالأسفل
+            // تم مسح شرط الـ Space من هنا لأن الموبايل يكره الـ preventDefault بالفراغ
         };
 
-        // معالجة النصوص وحساب عمليات الحذف والمسح المستمر بدقة
+        // 2. معالجة النصوص والمسح والفراغات كلها بمكان واحد
         hiddenInput.oninput = (e) => {
             const val = e.target.value;
             
             if (val.length < DUMMY.length) {
-                // المستخدم يمسح - نحسب كم نقطة انحذفت ونرسل بعددهم Backspace للسيرفر
+                // الحذف المستمر
                 const count = DUMMY.length - val.length;
                 for (let i = 0; i < count; i++) {
                     ws.send(JSON.stringify({ type: 'key', value: 'Backspace' }));
                 }
             } else if (val.length > DUMMY.length) {
-                // المستخدم يكتب - نأخذ النص الجديد الزائد عن الـ 10 نقاط ونرسله كـ text
+                // الكتابة (وتشمل الفراغ)
                 const added = val.substring(DUMMY.length);
-                ws.send(JSON.stringify({ type: 'text', value: added }));
+                
+                // هنا نلقف الفراغ مهما كان شكله ونرسله كـ key أو text
+                if (added === " ") {
+                    ws.send(JSON.stringify({ type: 'key', value: ' ' }));
+                } else {
+                    ws.send(JSON.stringify({ type: 'text', value: added }));
+                }
             }
             
-            // إعادة تصفير الحقل إلى الوضع الوهمي فوراً لاستقبال الضغطة القادمة
+            // تصفير الحقل فوراً
             hiddenInput.value = DUMMY;
         };
 
-        // عرض بث شاشة جهاز الأندرويد المستلم من السيرفر
         ws.onmessage = (event) => {
             if (event.data instanceof Blob) {
                 const url = URL.createObjectURL(event.data);
