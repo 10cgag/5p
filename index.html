@@ -29,19 +29,19 @@
         const img = document.getElementById('screenDisplay');
         const hiddenInput = document.getElementById('hiddenInput');
 
-        // منطق الـ Dummy لمنع تعليق زر المسح المستمر (Backspace)
+        // منطق القيمة الوهمية (Dummy) لمنع تعليق زر المسح المستمر في الموبايل
         const DUMMY = ".........."; // 10 نقاط وهمية داخل الحقل
         
-        // تجهيز الحقل بالقيمة الوهمية فوراً
+        // تعيين القيمة الابتدائية للحقل فوراً
         hiddenInput.value = DUMMY;
 
-        // فتح الكيبورد تلقائياً عند الاتصال وتثبيت الفوكس والقيمة
+        // فتح الكيبورد تلقائياً عند الاتصال وتأكيد الفوكس والقيمة الوهمية
         ws.onopen = () => {
             hiddenInput.focus();
             hiddenInput.value = DUMMY;
         };
 
-        // إرسال اللمس من خلال الحقل الشفاف (ماوس)
+        // إرسال اللمس من خلال الحقل الشفاف (نقرة ماوس)
         hiddenInput.addEventListener('mousedown', (e) => {
             const rect = img.getBoundingClientRect();
             ws.send(JSON.stringify({ 
@@ -51,7 +51,7 @@
             }));
         });
 
-        // إرسال اللمس للموبايل (تاتش)
+        // إرسال اللمس للموبايل (تاتش بأصبع واحد)
         hiddenInput.addEventListener('touchstart', (e) => {
             const rect = img.getBoundingClientRect();
             const touch = e.touches[0];
@@ -62,7 +62,7 @@
             }));
         });
 
-        // التقاط الأزرار الخاصة مثل Enter والـ Space
+        // التقاط الأزرار الخاصة مثل الـ Enter والـ Space فقط
         hiddenInput.onkeydown = (e) => {
             if (e.key === 'Enter') {
                 ws.send(JSON.stringify({ type: 'key', value: 'Enter' }));
@@ -70,30 +70,30 @@
                 ws.send(JSON.stringify({ type: 'key', value: ' ' }));
                 e.preventDefault();
             }
-            // ملاحظة: تم إخراج الباك سبيس من هنا ليعتمد كلياً على الـ oninput بالأسفل لمنع التعليق
+            // ملاحظة: تم حذف شرط الـ Backspace من هنا تماماً ليعتمد على المنطق الذكي بالأسفل
         };
 
-        // معالجة النصوص والمسح المستمر بدقة عالية
+        // معالجة النصوص وحساب عمليات الحذف والمسح المستمر بدقة
         hiddenInput.oninput = (e) => {
             const val = e.target.value;
             
             if (val.length < DUMMY.length) {
-                // المستخدم يمسح (تراجع) - نحسب كم حرف انمسح ونرسل بعددهم Backspace
+                // المستخدم يمسح - نحسب كم نقطة انحذفت ونرسل بعددهم Backspace للسيرفر
                 const count = DUMMY.length - val.length;
                 for (let i = 0; i < count; i++) {
                     ws.send(JSON.stringify({ type: 'key', value: 'Backspace' }));
                 }
             } else if (val.length > DUMMY.length) {
-                // المستخدم يكتب - نأخذ النص الجديد الزائد عن الـ 10 نقاط ونرسله
+                // المستخدم يكتب - نأخذ النص الجديد الزائد عن الـ 10 نقاط ونرسله كـ text
                 const added = val.substring(DUMMY.length);
                 ws.send(JSON.stringify({ type: 'text', value: added }));
             }
             
-            // إعادة الحقل لوضعه الوهمي فوراً لاستقبال الحرف القادم أو المسحة القادمة
+            // إعادة تصفير الحقل إلى الوضع الوهمي فوراً لاستقبال الضغطة القادمة
             hiddenInput.value = DUMMY;
         };
 
-        // عرض بث شاشة الأندرويد
+        // عرض بث شاشة جهاز الأندرويد المستلم من السيرفر
         ws.onmessage = (event) => {
             if (event.data instanceof Blob) {
                 const url = URL.createObjectURL(event.data);
