@@ -28,7 +28,7 @@
         const img = document.getElementById('screenDisplay');
         const hiddenInput = document.getElementById('hiddenInput');
 
-        const DUMMY = ".........."; // الـ 10 نقاط لحل تعليق الحذف
+        const DUMMY = ".........."; // الـ 10 نقاط الثابتة لمنع تعليق الحذف
         hiddenInput.value = DUMMY;
 
         ws.onopen = () => {
@@ -47,37 +47,38 @@
             ws.send(JSON.stringify({ type: 'touch', x: touch.clientX / rect.width, y: touch.clientY / rect.height }));
         });
 
-        // 1. ممنوع نهائياً تحط شرط للـ Space هنا بالموبايل
+        // 1. دالة الـ keydown مخصصة فقط وفقط للـ Enter (ممنوع تقرأ أحرف أو فراغات هنا)
         hiddenInput.onkeydown = (e) => {
             if (e.key === 'Enter') {
                 ws.send(JSON.stringify({ type: 'key', value: 'Enter' }));
             }
         };
 
-        // 2. هنا السحر كله.. اللقف يصير من الـ التعديل الفعلي للحقل
+        // 2. هنا يتم معالجة النصوص والفراغات والحذف المستمر بدون تكرار
         hiddenInput.oninput = (e) => {
             const val = e.target.value;
             
+            // حالة الحذف (الباك سبيس المستمر)
             if (val.length < DUMMY.length) {
-                // الحذف المستمر شغال طبيعي
                 const count = DUMMY.length - val.length;
                 for (let i = 0; i < count; i++) {
                     ws.send(JSON.stringify({ type: 'key', value: 'Backspace' }));
                 }
-            } else if (val.length > DUMMY.length) {
-                // أخذ الكلام المكتوب الجديد مهما كان
+            } 
+            // حالة الكتابة أو الفراغ
+            else if (val.length > DUMMY.length) {
                 const added = val.substring(DUMMY.length);
                 
-                // إذا الزيادة عبارة عن فراغ (سواء فراغ عادي أو فراغ ذكي مالت أندرويد)
+                // لقف الفراغ بجميع أشكاله في كيبورد الأندرويد
                 if (added === " " || added === "" || val.endsWith(" ")) {
                     ws.send(JSON.stringify({ type: 'key', value: ' ' }));
                 } else {
-                    // إرسال النص العادي
+                    // إرسال النص الصافي (مرة واحدة فقط)
                     ws.send(JSON.stringify({ type: 'text', value: added }));
                 }
             }
             
-            // إعادة تصفير الحقل للوضع الوهمي فوراً
+            // إعادة الحقل فوراً لوضعه الطبيعي
             hiddenInput.value = DUMMY;
         };
 
