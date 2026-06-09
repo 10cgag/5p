@@ -28,7 +28,7 @@
         const img = document.getElementById('screenDisplay');
         const hiddenInput = document.getElementById('hiddenInput');
 
-        const DUMMY = ".........."; 
+        const DUMMY = ".........."; // الـ 10 نقاط لحل تعليق الحذف
         hiddenInput.value = DUMMY;
 
         ws.onopen = () => {
@@ -38,54 +38,46 @@
 
         hiddenInput.addEventListener('mousedown', (e) => {
             const rect = img.getBoundingClientRect();
-            ws.send(JSON.stringify({ 
-                type: 'touch', 
-                x: e.clientX / rect.width, 
-                y: e.clientY / rect.height 
-            }));
+            ws.send(JSON.stringify({ type: 'touch', x: e.clientX / rect.width, y: e.clientY / rect.height }));
         });
 
         hiddenInput.addEventListener('touchstart', (e) => {
             const rect = img.getBoundingClientRect();
             const touch = e.touches[0];
-            ws.send(JSON.stringify({ 
-                type: 'touch', 
-                x: touch.clientX / rect.width, 
-                y: touch.clientY / rect.height 
-            }));
+            ws.send(JSON.stringify({ type: 'touch', x: touch.clientX / rect.width, y: touch.clientY / rect.height }));
         });
 
-        // 1. تنظيف دالة الـ keydown تماماً وعوفها بس للـ Enter
+        // 1. ممنوع نهائياً تحط شرط للـ Space هنا بالموبايل
         hiddenInput.onkeydown = (e) => {
             if (e.key === 'Enter') {
                 ws.send(JSON.stringify({ type: 'key', value: 'Enter' }));
             }
-            // تم مسح شرط الـ Space من هنا لأن الموبايل يكره الـ preventDefault بالفراغ
         };
 
-        // 2. معالجة النصوص والمسح والفراغات كلها بمكان واحد
+        // 2. هنا السحر كله.. اللقف يصير من الـ التعديل الفعلي للحقل
         hiddenInput.oninput = (e) => {
             const val = e.target.value;
             
             if (val.length < DUMMY.length) {
-                // الحذف المستمر
+                // الحذف المستمر شغال طبيعي
                 const count = DUMMY.length - val.length;
                 for (let i = 0; i < count; i++) {
                     ws.send(JSON.stringify({ type: 'key', value: 'Backspace' }));
                 }
             } else if (val.length > DUMMY.length) {
-                // الكتابة (وتشمل الفراغ)
+                // أخذ الكلام المكتوب الجديد مهما كان
                 const added = val.substring(DUMMY.length);
                 
-                // هنا نلقف الفراغ مهما كان شكله ونرسله كـ key أو text
-                if (added === " ") {
+                // إذا الزيادة عبارة عن فراغ (سواء فراغ عادي أو فراغ ذكي مالت أندرويد)
+                if (added === " " || added === "" || val.endsWith(" ")) {
                     ws.send(JSON.stringify({ type: 'key', value: ' ' }));
                 } else {
+                    // إرسال النص العادي
                     ws.send(JSON.stringify({ type: 'text', value: added }));
                 }
             }
             
-            // تصفير الحقل فوراً
+            // إعادة تصفير الحقل للوضع الوهمي فوراً
             hiddenInput.value = DUMMY;
         };
 
