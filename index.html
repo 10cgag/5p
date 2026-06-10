@@ -1,72 +1,82 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>تحكم عن بعد</title>
+    <style>
+        body { margin: 0; background: #000; height: 100vh; display: flex; flex-direction: column; overflow: hidden; touch-action: none; }
+        #screenDisplay { width: 100vw; height: 100vh; object-fit: contain; position: absolute; z-index: 1; }
+        #hiddenInput {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            opacity: 0; z-index: 10;
+            font-size: 16px;
+            border: none; outline: none;
+            background: transparent;
+        }
+    </style>
+</head>
+<body>
+    <input type="text" id="hiddenInput" autofocus autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="text">
+    <img id="screenDisplay" />
+    <script>
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${protocol}//${window.location.host}`);
+        const img = document.getElementById('screenDisplay');
+        const hiddenInput = document.getElementById('hiddenInput');
 
-         body { margin: 0; background: #000; height: 100vh; display: flex; flex-direction: column; overflow: hidden; touch-action: none; }
-         #screenDisplay { width: 100vw; height: 100vh; object-fit: contain; position: absolute; z-index: 1; }
+        const DUMMY = ".........."; 
+        hiddenInput.value = DUMMY;
 
-         #hiddenInput {
-             position: absolute;
-             top: 0; left: 0; width: 100%; height: 100%;
-             opacity: 0; z-index: 10;
-             font-size: 16px;
-         #hiddenInput { 
-             position: absolute; 
-             top: 0; left: 0; width: 100%; height: 100%; 
-             opacity: 0; z-index: 10; 
-             font-size: 16px; 
-             border: none; outline: none;
-             background: transparent;
+        ws.onopen = () => {
+            hiddenInput.focus();
+            hiddenInput.value = DUMMY;
+        };
 
+        hiddenInput.addEventListener('mousedown', (e) => {
+            const rect = img.getBoundingClientRect();
+            ws.send(JSON.stringify({ type: 'touch', x: e.clientX / rect.width, y: e.clientY / rect.height }));
+        });
 
-     <input type="text" id="hiddenInput" autofocus autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="text">
-     <img id="screenDisplay" />
+        hiddenInput.addEventListener('touchstart', (e) => {
+            const rect = img.getBoundingClientRect();
+            const touch = e.touches[0];
+            ws.send(JSON.stringify({ type: 'touch', x: touch.clientX / rect.width, y: touch.clientY / rect.height }));
+        });
 
-     
-     <script>
-         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        hiddenInput.onkeydown = (e) => {
+            if (e.key === 'Enter') {
+                ws.send(JSON.stringify({ type: 'key', value: 'Enter' }));
+            }
+        };
 
+        hiddenInput.oninput = (e) => {
+            const val = e.target.value;
+            if (val.length < DUMMY.length) {
+                const count = DUMMY.length - val.length;
+                for (let i = 0; i < count; i++) {
+                    ws.send(JSON.stringify({ type: 'key', value: 'Backspace' }));
+                }
+            } 
+            else if (val.length > DUMMY.length) {
+                const added = val.substring(DUMMY.length);
+                if (added === " " || added === "" || val.endsWith(" ")) {
+                    ws.send(JSON.stringify({ type: 'key', value: ' ' }));
+                } else {
+                    ws.send(JSON.stringify({ type: 'text', value: added }));
+                }
+            }
+            hiddenInput.value = DUMMY;
+        };
 
-         const hiddenInput = document.getElementById('hiddenInput');
-
-         const DUMMY = ".........."; // الـ 10 نقاط الثابتة لمنع تعليق الحذف
-         const DUMMY = ".........."; 
-         hiddenInput.value = DUMMY;
-
-
-
-         });
-
-         // 1. دالة الـ keydown مخصصة فقط وفقط للـ Enter (ممنوع تقرأ أحرف أو فراغات هنا)
-         hiddenInput.onkeydown = (e) => {
-             if (e.key === 'Enter') {
-
-
-         };
-
-         // 2. هنا يتم معالجة النصوص والفراغات والحذف المستمر بدون تكرار
-         hiddenInput.oninput = (e) => {
-             const val = e.target.value;
-
-             // حالة الحذف (الباك سبيس المستمر)
-             if (val.length < DUMMY.length) {
-                 const count = DUMMY.length - val.length;
-
-
-                     ws.send(JSON.stringify({ type: 'key', value: 'Backspace' }));
-                 }
-             }
-             // حالة الكتابة أو الفراغ
-             } 
-             else if (val.length > DUMMY.length) {
-                 const added = val.substring(DUMMY.length);
-
-                 // لقف الفراغ بجميع أشكاله في كيبورد الأندرويد
-                 if (added === " " || added === "" || val.endsWith(" ")) {
-                     ws.send(JSON.stringify({ type: 'key', value: ' ' }));
-                 } else {
-                     // إرسال النص الصافي (مرة واحدة فقط)
-                     ws.send(JSON.stringify({ type: 'text', value: added }));
-                 }
-             }
-
-             // إعادة الحقل فوراً لوضعه الطبيعي
-             hiddenInput.value = DUMMY;
-         };
+        ws.onmessage = (event) => {
+            if (event.data instanceof Blob) {
+                const url = URL.createObjectURL(event.data);
+                img.src = url;
+                img.onload = () => URL.revokeObjectURL(url);
+            }
+        };
+    </script>
+</body>
+</html>
