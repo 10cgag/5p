@@ -17,15 +17,17 @@
             margin: 0;
         }
         #status {
-            margin-bottom: 10px;
-            font-size: 14px;
+            margin-bottom: 15px;
+            font-size: 16px;
+            font-weight: bold;
             color: #00ffcc;
         }
         img {
             max-width: 100%;
-            max-height: 80vh;
+            max-height: 85vh;
             border: 2px solid #333;
             border-radius: 8px;
+            object-fit: contain;
         }
     </style>
 </head>
@@ -38,18 +40,30 @@
         const statusDiv = document.getElementById('status');
         const imgElement = document.getElementById('remoteScreen');
 
-        // التحديد التلقائي لبروتوكول الـ WebSocket (wss لـ Render و ws للـ Local)
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const socket = new WebSocket(`${protocol}//${window.location.host}`);
+        
+        // تحديد استقبال البيانات كـ Blob
+        socket.binaryType = 'blob';
 
         socket.onopen = () => {
             statusDiv.innerText = 'متصل بالسيرفر بنجاح ✅';
             statusDiv.style.color = '#00ffcc';
         };
 
+        let lastObjectUrl = null;
+
         socket.onmessage = (event) => {
-            // استقبال الإطارات وعرضها
-            imgElement.src = event.data;
+            if (event.data instanceof Blob) {
+                // إلغاء الرابط القديم لتفادي استهلاك الذاكرة
+                if (lastObjectUrl) {
+                    URL.revokeObjectURL(lastObjectUrl);
+                }
+                lastObjectUrl = URL.createObjectURL(event.data);
+                imgElement.src = lastObjectUrl;
+            } else if (typeof event.data === 'string') {
+                imgElement.src = event.data;
+            }
         };
 
         socket.onclose = () => {
