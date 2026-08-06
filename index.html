@@ -8,7 +8,7 @@
         body { margin: 0; background: #000; height: 100vh; display: flex; flex-direction: column; overflow: hidden; touch-action: none; }
         #screenDisplay { width: 100vw; height: 100vh; object-fit: contain; position: absolute; z-index: 1; }
         
-        /* حقل الكتابة الشفاف */
+        /* حقل شفاف من نوع password لمنع تكرار الحروف المزعج */
         #hiddenInput { 
             position: absolute; 
             top: 0; left: 0; width: 100%; height: 100%; 
@@ -18,7 +18,7 @@
     </style>
 </head>
 <body>
-    <input type="text" id="hiddenInput" autofocus autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="text">
+    <input type="password" id="hiddenInput" autofocus autocomplete="off" inputmode="text">
     <img id="screenDisplay" />
     
     <script>
@@ -27,19 +27,17 @@
         const img = document.getElementById('screenDisplay');
         const hiddenInput = document.getElementById('hiddenInput');
 
-        // نستخدم مسافة واحدة كقيمة وهمية لضمان عمل الكيبورد في الموبايل
-        const DUMMY = " "; 
+        // قيمة وهمية بسيطة
+        const DUMMY = "•"; 
         hiddenInput.value = DUMMY;
 
         ws.onopen = () => {
             hiddenInput.focus();
-            hiddenInput.setSelectionRange(1, 1);
         };
 
-        // إرسال اللمس (يدعم الماوس واللمس معاً)
+        // إرسال اللمس بدقة
         function sendTouch(clientX, clientY) {
             const rect = img.getBoundingClientRect();
-            // حساب الإحداثيات مع مراعاة أبعاد الصورة الفعلية
             ws.send(JSON.stringify({ 
                 type: 'touch', 
                 x: clientX / rect.width, 
@@ -47,16 +45,10 @@
             }));
         }
 
-        hiddenInput.addEventListener('mousedown', (e) => {
-            sendTouch(e.clientX, e.clientY);
-        });
+        hiddenInput.addEventListener('mousedown', (e) => sendTouch(e.clientX, e.clientY));
+        hiddenInput.addEventListener('touchstart', (e) => sendTouch(e.touches[0].clientX, e.touches[0].clientY));
 
-        hiddenInput.addEventListener('touchstart', (e) => {
-            const touch = e.touches[0];
-            sendTouch(touch.clientX, touch.clientY);
-        });
-
-        // التقاط الأزرار الخاصة
+        // الأزرار الخاصة
         hiddenInput.onkeydown = (e) => {
             if (e.key === 'Enter') {
                 ws.send(JSON.stringify({ type: 'key', value: 'Enter' }));
@@ -66,27 +58,24 @@
             }
         };
 
-        // معالجة النصوص وحساب عمليات المسح والكتابة
+        // معالجة النصوص ومنع التكرار
         hiddenInput.oninput = (e) => {
             const val = e.target.value;
             
             if (val.length < DUMMY.length) {
-                // تم الضغط على مسح (Backspace)
+                // ضغطة مسح Backspace
                 ws.send(JSON.stringify({ type: 'key', value: 'Backspace' }));
             } else if (val.length > DUMMY.length) {
-                // تم كتابة نص جديد
-                const added = val.replace(DUMMY, "");
-                if (added.length > 0) {
-                    ws.send(JSON.stringify({ type: 'text', value: added }));
-                }
+                // كتابة نص جديد
+                const added = val.substring(DUMMY.length);
+                ws.send(JSON.stringify({ type: 'text', value: added }));
             }
             
-            // إعادة الحقل لوضعه الأصلي فوراً
+            // إعادة التصفير فوراً
             hiddenInput.value = DUMMY;
-            hiddenInput.setSelectionRange(1, 1);
         };
 
-        // عرض بث الشاشة
+        // استقبال بث الشاشة
         ws.onmessage = (event) => {
             if (event.data instanceof Blob) {
                 const url = URL.createObjectURL(event.data);
@@ -95,7 +84,7 @@
             }
         };
 
-        // إعادة التركيز على الحقل إذا فقده
+        // الحفاظ على الفوكس للكيبورد
         document.body.onclick = () => hiddenInput.focus();
     </script>
 </body>
