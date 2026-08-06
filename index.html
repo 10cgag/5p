@@ -1,49 +1,73 @@
-const express = require('express');
-const http = require('http');
-const WebSocket = require('ws');
-const path = require('path');
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>5P Pro Control</title>
+    <style>
+        body { background: #000; color: #fff; font-family: sans-serif; margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        #header { background: #111; padding: 10px; text-align: center; border-bottom: 1px solid #333; color: #00ffcc; font-weight: bold; }
+        #container { flex: 1; display: flex; justify-content: center; align-items: center; background: #000; position: relative; }
+        #remoteScreen { max-width: 100%; max-height: 100%; object-fit: contain; }
+        #controls { background: #111; padding: 10px; display: flex; gap: 8px; border-top: 1px solid #333; }
+        #textInput { flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #444; background: #222; color: #fff; font-size: 16px; outline: none; }
+        #sendBtn { padding: 10px 20px; border-radius: 8px; background: #00ffcc; color: #000; font-weight: bold; border: none; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="header">تحكم نشط - اضغط على الشاشة</div>
+    <div id="container"><img id="remoteScreen" draggable="false" /></div>
+    <div id="controls">
+        <input type="text" id="textInput" placeholder="اكتب للبحث..." autocomplete="off">
+        <button id="sendBtn">إرسال</button>
+    </div>
 
-const app = express();
-const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
+    <script>
+        const statusDiv = document.getElementById('header');
+        const img = document.getElementById('remoteScreen');
+        const socket = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`);
+        socket.binaryType = 'blob';
 
-app.use(express.static(path.join(__dirname)));
+        socket.onopen = () => { statusDiv.innerText = "✅ متصل وجاهز للتحكم"; };
 
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
+        socket.onmessage = (e) => {
+            if (e.data instanceof Blob) {
+                const url = URL.createObjectURL(e.data);
+                const old = img.src;
+                img.src = url;
+                if (old) URL.revokeObjectURL(old);
+            }
+        };
 
-wss.on('connection', (ws) => {
-    console.log('New connection established');
-    ws.isAlive = true;
-    ws.on('pong', () => { ws.isAlive = true; });
+        function handle(e) {
+            e.preventDefault();
+            const rect = img.getBoundingClientRect();
+            const cX = e.clientX || (e.touches && e.touches[0].clientX);
+            const cY = e.clientY || (e.touches && e.touches[0].clientY);
+            
+            // حساب الموقع كنسبة مئوية من حجم الصورة المعروضة
+            const x = (cX - rect.left) / rect.width;
+            const y = (cY - rect.top) / rect.height;
 
-    ws.on('message', (message) => {
-        // تمرير الأوامر فقط (اللمس والنص)
-        if (typeof message === 'string' || (message instanceof Buffer && message.length < 1000)) {
-            console.log('Remote Command:', message.toString());
+            if (x >= 0 && x <= 1 && y >= 0 && y <= 1 && socket.readyState === 1) {
+                socket.send(JSON.stringify({ type: 'touch', x: x, y: y }));
+                statusDiv.innerText = "👆 تم إرسال لمسة للموبايل...";
+                setTimeout(() => { statusDiv.innerText = "تحكم نشط - اضغط على الشاشة"; }, 500);
+            }
         }
 
-        wss.clients.forEach((client) => {
-            if (client !== ws && client.readyState === WebSocket.OPEN) {
-                client.send(message);
+        img.addEventListener('mousedown', handle);
+        img.addEventListener('touchstart', handle, { passive: false });
+
+        document.getElementById('sendBtn').onclick = () => {
+            const val = document.getElementById('textInput').value;
+            if (val && socket.readyState === 1) {
+                socket.send(JSON.stringify({ type: 'text', value: val }));
+                socket.send(JSON.stringify({ type: 'key', value: 'Enter' }));
+                document.getElementById('textInput').value = '';
             }
-        });
-    });
-
-    ws.on('close', () => console.log('Client disconnected'));
-});
-
-// الحفاظ على استقرار الاتصال في Render
-const interval = setInterval(() => {
-    wss.clients.forEach((ws) => {
-        if (ws.isAlive === false) return ws.terminate();
-        ws.isAlive = false;
-        ws.ping();
-    });
-}, 25000);
-
-wss.on('close', () => clearInterval(interval));
-
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Server live on port ${PORT}`));
+        };
+        socket.onclose = () => statusDiv.innerText = "انقطع الاتصال ❌";
+    </script>
+</body>
+</html>
