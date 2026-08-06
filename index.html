@@ -7,53 +7,84 @@
     <style>
         body { margin: 0; background: #000; height: 100vh; display: flex; flex-direction: column; overflow: hidden; touch-action: none; }
         #screenDisplay { width: 100vw; height: 100vh; object-fit: contain; position: absolute; z-index: 1; }
-        #hiddenInput { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; z-index: 10; font-size: 16px; border: none; outline: none; background: transparent; }
+        #hiddenInput { 
+            position: absolute; 
+            top: 0; left: 0; width: 100%; height: 100%; 
+            opacity: 0; z-index: 10; 
+            font-size: 16px; border: none; outline: none; background: transparent;
+        }
     </style>
 </head>
 <body>
-    <!-- إعادة النوع إلى text مع تعطيل التصحيح يدوياً -->
-    <input type="text" id="hiddenInput" autofocus autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" inputmode="text">
+    <input type="text" id="hiddenInput" autofocus autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="text">
     <img id="screenDisplay" />
+    
     <script>
-        const ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`);
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${protocol}//${window.location.host}`);
         const img = document.getElementById('screenDisplay');
         const hiddenInput = document.getElementById('hiddenInput');
         const DUMMY = " "; 
-        hiddenInput.value = DUMMY;
-        ws.onopen = () => hiddenInput.focus();
 
-        function sendTouch(cX, cY) {
+        hiddenInput.value = DUMMY;
+
+        // إرسال اللمس
+        function sendTouch(clientX, clientY) {
             const rect = img.getBoundingClientRect();
-            ws.send(JSON.stringify({ type: 'touch', x: cX / rect.width, y: cY / rect.height }));
+            ws.send(JSON.stringify({ 
+                type: 'touch', 
+                x: clientX / rect.width, 
+                y: clientY / rect.height 
+            }));
         }
 
         hiddenInput.addEventListener('mousedown', (e) => sendTouch(e.clientX, e.clientY));
         hiddenInput.addEventListener('touchstart', (e) => sendTouch(e.touches[0].clientX, e.touches[0].clientY));
 
+        // الأزرار الخاصة
         hiddenInput.onkeydown = (e) => {
             if (e.key === 'Enter') ws.send(JSON.stringify({ type: 'key', value: 'Enter' }));
-            else if (e.key === ' ') { ws.send(JSON.stringify({ type: 'key', value: ' ' })); e.preventDefault(); }
+            else if (e.key === ' ') { 
+                ws.send(JSON.stringify({ type: 'key', value: ' ' })); 
+                e.preventDefault(); 
+            }
         };
 
+        // معالجة النصوص وحساب المسح والكتابة
         hiddenInput.oninput = (e) => {
             const val = e.target.value;
             if (val.length < DUMMY.length) {
                 ws.send(JSON.stringify({ type: 'key', value: 'Backspace' }));
             } else if (val.length > DUMMY.length) {
                 const added = val.replace(DUMMY, "");
-                if (added.length > 0) ws.send(JSON.stringify({ type: 'text', value: added }));
+                if (added.length > 0) {
+                    ws.send(JSON.stringify({ type: 'text', value: added }));
+                }
             }
             hiddenInput.value = DUMMY;
+            hiddenInput.setSelectionRange(1, 1);
         };
 
+        // استقبال البيانات (بث الشاشة + حالة الكيبورد)
         ws.onmessage = (event) => {
             if (event.data instanceof Blob) {
                 const url = URL.createObjectURL(event.data);
                 img.src = url;
                 img.onload = () => URL.revokeObjectURL(url);
+            } else {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'keyboard_state') {
+                        if (data.visible) {
+                            hiddenInput.focus(); // فتح كيبورد المتصفح تلقائياً
+                            hiddenInput.value = DUMMY;
+                        } else {
+                            hiddenInput.blur(); // إغلاق كيبورد المتصفح تلقائياً
+                        }
+                    }
+                } catch (e) { }
             }
         };
-        document.body.onclick = () => hiddenInput.focus();
     </script>
 </body>
 </html>
