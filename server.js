@@ -7,8 +7,6 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
-app.use(express.static(path.join(__dirname)));
-
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 wss.on('connection', (ws) => {
@@ -17,8 +15,8 @@ wss.on('connection', (ws) => {
             const messageString = data.toString();
             const parsed = JSON.parse(messageString);
             
-            // إضافة 'key' للسماح بمرور أوامر المسح (Backspace) والـ Enter والـ Space
-            if (parsed.type === 'touch' || parsed.type === 'text' || parsed.type === 'key') {
+            // إعادة توجيه الأوامر وحالة الكيبورد
+            if (['touch', 'text', 'key', 'keyboard_state'].includes(parsed.type)) {
                 wss.clients.forEach((client) => {
                     if (client !== ws && client.readyState === 1) {
                         client.send(messageString);
@@ -26,7 +24,6 @@ wss.on('connection', (ws) => {
                 });
             }
         } catch (e) {
-            // بث الصور (Binary Data)
             wss.clients.forEach((client) => {
                 if (client !== ws && client.readyState === 1) {
                     client.send(data);
@@ -37,4 +34,4 @@ wss.on('connection', (ws) => {
 });
 
 const port = process.env.PORT || 3000;
-server.listen(port, () => console.log(`Server live on port ${port}`));
+server.listen(port, () => console.log(`Server running on port ${port}`));
