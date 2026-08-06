@@ -1,45 +1,47 @@
 const express = require('express');
 const http = require('http');
-const { WebSocketServer } = require('ws');
+const WebSocket = require('ws');
 const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
+const wss = new WebSocket.Server({ server });
 
-app.use(express.static(path.join(__dirname)));
+app.use(express.static(path.join(__dirname, '../'))); // الوصول للملفات في المجلد الرئيسي
 
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
-
-wss.on('connection', (ws) => {
-    console.log('New device connected');
-
-    ws.on('message', (data) => {
-        try {
-            // محاولة معالجة الرسائل النصية (أوامر)
-            const messageString = data.toString();
-            const parsed = JSON.parse(messageString);
-            
-            // تمرير أوامر اللمس، الكيبورد، وحالة الكاميرا
-            if (['touch', 'text', 'key', 'keyboard_state', 'camera_request'].includes(parsed.type)) {
-                wss.clients.forEach((client) => {
-                    if (client !== ws && client.readyState === 1) {
-                        client.send(messageString);
-                    }
-                });
-            }
-        } catch (e) {
-            // تمرير البيانات الثنائية (Binary) - صور الشاشة أو صور الكاميرا
-            wss.clients.forEach((client) => {
-                if (client !== ws && client.readyState === 1) {
-                    client.send(data);
-                }
-            });
-        }
-    });
-
-    ws.on('close', () => console.log('Device disconnected'));
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, '../index.html'));
 });
 
-const port = process.env.PORT || 3000;
-server.listen(port, () => console.log(`Server is running on port ${port}`));
+wss.on('connection', (ws) => {
+    console.log('New connection established');
+    ws.on('message', (data) => {
+        // إذا كانت البيانات نصية (JSON)
+        if (typeof data === 'string' || data instanceof Buffer) {
+            try {
+                const message = data.toString();
+                if (message.startsWith('{')) {
+                    const json = JSON.parse(message);
+                    
+                    // إعادة توجيه فريمات الكاميرا واللمس والنصوص للجميع
+                    wss.clients.forEach((client) => {
+                        if (client !== ws && client.readyState === WebSocket.OPEN) {
+                            client.send(message);
+                        }
+                    });
+                    return;
+                }
+            } catch (e) {}
+        }
+
+        // توجيه البيانات الثنائية (صور الشاشة) للجميع
+        wss.clients.forEach((client) => {
+            if (client !== ws && client.readyState === WebSocket.OPEN) {
+                client.send(data);
+            }
+        });
+    });
+});
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log('Server is live!'));
