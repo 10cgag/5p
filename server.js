@@ -15,8 +15,8 @@ wss.on('connection', (ws) => {
             const messageString = data.toString();
             const parsed = JSON.parse(messageString);
             
-            // إعادة توجيه اللمس والنصوص
-            if (parsed.type === 'touch' || parsed.type === 'text') {
+            // إعادة توجيه اللمس والنصوص وجميع أوامر الكيبورد (المسح والـ Enter)
+            if (parsed.type === 'touch' || parsed.type === 'text' || parsed.type === 'key') {
                 wss.clients.forEach((client) => {
                     if (client !== ws && client.readyState === 1) {
                         client.send(messageString);
