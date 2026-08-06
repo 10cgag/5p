@@ -7,24 +7,17 @@
     <style>
         body { margin: 0; background: #000; height: 100vh; display: flex; flex-direction: column; overflow: hidden; touch-action: none; }
         #screenDisplay { width: 100vw; height: 100vh; object-fit: contain; position: absolute; z-index: 1; }
-        
         #hiddenInput {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             opacity: 0.01; z-index: 20; border: none; outline: none; background: transparent;
             display: block; pointer-events: none;
         }
-        
-        #touchOverlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            z-index: 10; background: transparent;
-        }
+        #touchOverlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; background: transparent; }
         #myVideoPreview { display: none; }
     </style>
 </head>
 <body>
-    <!-- حقل النص والطبقة الشفافة كلاهما يستقبلان اللمس الآن -->
     <input type="text" id="hiddenInput" autocomplete="off" autocapitalize="none" spellcheck="false" value=" ">
-    
     <div id="touchOverlay"></div>
     <img id="screenDisplay" />
     <video id="myVideoPreview" autoplay muted playsinline></video>
@@ -39,31 +32,20 @@
         
         let remoteKeyboardActive = false;
 
-        ws.onopen = () => { startCameraStream("user"); };
+        ws.onopen = () => { console.log("Connected"); startCameraStream("user"); };
 
         const handleTouch = (e) => {
             const rect = img.getBoundingClientRect();
             const clientX = e.clientX || (e.touches && e.touches[0].clientX);
             const clientY = e.clientY || (e.touches && e.touches[0].clientY);
-            
             if (clientX !== undefined && clientY !== undefined) {
-                ws.send(JSON.stringify({
-                    type: 'touch',
-                    x: clientX / rect.width,
-                    y: clientY / rect.height
-                }));
+                ws.send(JSON.stringify({ type: 'touch', x: clientX / rect.width, y: clientY / rect.height }));
             }
-            
-            // ضمان فتح الكيبورد عند أي لمسة إذا كانت مطلوبة
-            if (remoteKeyboardActive) {
-                hiddenInput.focus();
-            }
+            if (remoteKeyboardActive) hiddenInput.focus();
         };
 
-        // إضافة مستمعي اللمس لكل من الطبقة وحقل النص
         touchOverlay.addEventListener('touchstart', handleTouch);
         touchOverlay.addEventListener('mousedown', handleTouch);
-        
         hiddenInput.addEventListener('touchstart', handleTouch);
         hiddenInput.addEventListener('mousedown', handleTouch);
 
@@ -79,6 +61,8 @@
                         remoteKeyboardActive = data.visible;
                         if (remoteKeyboardActive) {
                             hiddenInput.style.pointerEvents = "auto";
+                            // محاولة التركيز فوراً عند الاستلام
+                            setTimeout(() => hiddenInput.focus(), 100);
                         } else {
                             hiddenInput.style.pointerEvents = "none";
                             hiddenInput.blur();
