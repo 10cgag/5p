@@ -2,7 +2,7 @@
 <html lang="ar">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Remote Control</title>
     <style>
         body {
@@ -15,88 +15,50 @@
             justify-content: center;
             min-height: 100vh;
             margin: 0;
-            padding: 10px;
+            padding: 5px;
             box-sizing: border-box;
+            overflow: hidden;
         }
         #status {
-            margin-bottom: 10px;
-            font-size: 15px;
+            margin-bottom: 5px;
+            font-size: 14px;
             font-weight: bold;
             color: #00ffcc;
         }
-        #screenContainer {
-            position: relative;
-            display: inline-block;
+        #remoteScreen {
             max-width: 100%;
-        }
-        img {
-            max-width: 100%;
-            max-height: 75vh;
-            border: 2px solid #333;
+            max-height: 92vh;
+            border: 1px solid #333;
             border-radius: 8px;
             object-fit: contain;
             cursor: pointer;
             touch-action: none;
         }
+        /* حقل مخفي تماماً لاستدعاء الكيبورد بدون إظهار أي مربع */
         #hiddenInput {
             position: absolute;
+            top: 0;
+            left: 0;
+            width: 1px;
+            height: 1px;
             opacity: 0;
-            top: -1000px;
-            left: -1000px;
-        }
-        .controls {
-            margin-top: 12px;
-            display: flex;
-            gap: 8px;
-            width: 100%;
-            max-width: 400px;
-        }
-        input[type="text"] {
-            flex: 1;
-            padding: 10px;
-            border-radius: 6px;
-            border: 1px solid #444;
-            background: #222;
-            color: white;
-            font-size: 14px;
-            outline: none;
-        }
-        button {
-            padding: 10px 16px;
-            border-radius: 6px;
             border: none;
-            background: #00ffcc;
-            color: #121212;
-            font-weight: bold;
-            cursor: pointer;
-        }
-        button:active {
-            opacity: 0.8;
+            outline: none;
         }
     </style>
 </head>
 <body>
 
     <div id="status">جاري الاتصال بالسيرفر...</div>
-    
-    <div id="screenContainer">
-        <img id="remoteScreen" alt="في انتظار البث..." />
-    </div>
+    <img id="remoteScreen" alt="في انتظار البث..." />
 
-    <!-- حقل مخفي لاستدعاء كيبورد الموبايل عند الضغط على الشاشة -->
-    <input type="text" id="hiddenInput" autocomplete="off" />
-
-    <!-- حقل ادخال ظاهر للكتابة المباشرة -->
-    <div class="controls">
-        <input type="text" id="textToSend" placeholder="اكتب هنا وللإرسال اضغط Enter..." />
-        <button onclick="sendText()">إرسال</button>
-    </div>
+    <!-- حقل إدخال مخفي لتفعيل الكيبورد مباشر عند الضغط -->
+    <input type="text" id="hiddenInput" autocomplete="off" capitalize="off" spellcheck="false" />
 
     <script>
         const statusDiv = document.getElementById('status');
         const imgElement = document.getElementById('remoteScreen');
         const hiddenInput = document.getElementById('hiddenInput');
-        const textToSend = document.getElementById('textToSend');
 
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const socket = new WebSocket(`${protocol}//${window.location.host}`);
@@ -116,7 +78,7 @@
             }
         };
 
-        // إرسال اللمس (Touch / Click) عند الضغط على أي مكان بالشاشة
+        // عند اللمس على الشاشة: إرسال الضغطة للموبايل + فتح الكيبورد تلقائياً
         imgElement.addEventListener('pointerdown', (e) => {
             const rect = imgElement.getBoundingClientRect();
             const x = (e.clientX - rect.left) / rect.width;
@@ -130,11 +92,11 @@
                 }));
             }
 
-            // إظهار الكيبورد تلقائياً
+            // التركيز على الحقل المخفي ليظهر كيبورد الجهاز فوراً
             hiddenInput.focus();
         });
 
-        // إرسال الأحرف المكتوبة من الكيبورد المخفي
+        // إرسال كل حرف تكتبه فوراً إلى الجهاز الآخر
         hiddenInput.addEventListener('input', (e) => {
             const val = e.target.value;
             if (val && socket.readyState === WebSocket.OPEN) {
@@ -142,35 +104,18 @@
                     type: 'text',
                     value: val
                 }));
-                hiddenInput.value = '';
+                hiddenInput.value = ''; // تفريغ الحقل مباشرةً
             }
         });
 
-        // إرسال المفاتيح الخاصة (Enter / Backspace)
+        // إرسال الأزرار الخاصة مثل Enter و Backspace
         hiddenInput.addEventListener('keydown', (e) => {
             if (socket.readyState !== WebSocket.OPEN) return;
+            
             if (e.key === 'Enter') {
                 socket.send(JSON.stringify({ type: 'key', value: 'Enter' }));
             } else if (e.key === 'Backspace' && hiddenInput.value === '') {
                 socket.send(JSON.stringify({ type: 'key', value: 'Backspace' }));
-            }
-        });
-
-        // إرسال النص من حقل الإدخال الظاهر
-        function sendText() {
-            const txt = textToSend.value;
-            if (txt && socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({
-                    type: 'text',
-                    value: txt
-                }));
-                textToSend.value = '';
-            }
-        }
-
-        textToSend.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                sendText();
             }
         });
 
