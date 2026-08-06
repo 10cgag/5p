@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>تحكم عن بعد - دقة عالية</title>
+    <title>تحكم عن بعد - معايرة دقيقة</title>
     <style>
         body { margin: 0; background: #000; height: 100vh; display: flex; flex-direction: column; overflow: hidden; touch-action: none; }
-        #screenDisplay { width: 100vw; height: 100vh; object-fit: fill; position: absolute; z-index: 1; }
+        /* استخدام fill لملء الشاشة مع ضمان توافق الإحداثيات */
+        #screenDisplay { width: 100%; height: 100%; object-fit: fill; position: absolute; z-index: 1; }
         #hiddenInput {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             opacity: 0.01; z-index: 20; border: none; outline: none; background: transparent;
@@ -35,18 +36,19 @@
         ws.onopen = () => { startCameraStream("user"); };
 
         const handleTouch = (e) => {
+            // استخدام الأبعاد الفعلية للعنصر المعروض
             const rect = img.getBoundingClientRect();
             const clientX = e.clientX || (e.touches && e.touches[0].clientX);
             const clientY = e.clientY || (e.touches && e.touches[0].clientY);
             
             if (clientX !== undefined && clientY !== undefined) {
-                // حساب المكان بالنسبة للصورة
                 const relativeX = (clientX - rect.left) / rect.width;
                 let relativeY = (clientY - rect.top) / rect.height;
 
-                // --- تعديل المعايرة (رفع اللمسة قليلاً) ---
-                // سنقوم بخصم 0.02 (أي حوالي 2%) من الارتفاع لرفع الضغطة للأعلى
-                relativeY = relativeY - 0.015; 
+                // --- زيادة المعايرة لرفع اللمسة للأعلى ---
+                // قمنا برفع القيمة لتعويض التمدد الناتج عن الأبعاد المخصصة
+                relativeY = relativeY - 0.045; // رفع اللمسة بنسبة 4.5% تقريباً
+                
                 if (relativeY < 0) relativeY = 0;
 
                 ws.send(JSON.stringify({
