@@ -11,22 +11,20 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 wss.on('connection', (ws) => {
     ws.on('message', (data) => {
-        let messageString = data.toString();
-        
-        // محاولة فحص هل الرسالة إحداثيات لمس (JSON) أم صورة (Binary)
         try {
+            const messageString = data.toString();
             const parsed = JSON.parse(messageString);
-            if (parsed.type === 'touch') {
-                // إرسال اللمسة للأندرويد فقط (جميع العملاء عدا المرسل)
+            
+            // إعادة توجيه اللمس والنصوص
+            if (parsed.type === 'touch' || parsed.type === 'text') {
                 wss.clients.forEach((client) => {
                     if (client !== ws && client.readyState === 1) {
                         client.send(messageString);
                     }
                 });
-                return;
             }
         } catch (e) {
-            // إذا فشل الـ JSON، فهي صورة، أرسلها للجميع
+            // إعادة توجيه الصور (Binary)
             wss.clients.forEach((client) => {
                 if (client !== ws && client.readyState === 1) {
                     client.send(data);
