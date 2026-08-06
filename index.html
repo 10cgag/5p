@@ -144,6 +144,15 @@
                         x: x,
                         y: y
                     }));
+                    
+                    // تنبيه مرئي في المتصفح عند الضغط
+                    const oldText = statusDiv.innerText;
+                    statusDiv.innerText = "👆 تم إرسال ضغطة...";
+                    statusDiv.style.color = "#fff";
+                    setTimeout(() => { 
+                        statusDiv.innerText = oldText; 
+                        statusDiv.style.color = "#00ffcc";
+                    }, 400);
                 }
             }
         }
