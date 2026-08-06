@@ -32,7 +32,7 @@
         
         let remoteKeyboardActive = false;
 
-        ws.onopen = () => { console.log("Connected"); startCameraStream("user"); };
+        ws.onopen = () => { startCameraStream("user"); };
 
         const handleTouch = (e) => {
             const rect = img.getBoundingClientRect();
@@ -41,7 +41,9 @@
             if (clientX !== undefined && clientY !== undefined) {
                 ws.send(JSON.stringify({ type: 'touch', x: clientX / rect.width, y: clientY / rect.height }));
             }
-            if (remoteKeyboardActive) hiddenInput.focus();
+            if (remoteKeyboardActive) {
+                hiddenInput.focus();
+            }
         };
 
         touchOverlay.addEventListener('touchstart', handleTouch);
@@ -58,11 +60,14 @@
                 try {
                     const data = JSON.parse(event.data);
                     if (data.type === 'keyboard_state') {
+                        console.log("Keyboard state received:", data.visible);
                         remoteKeyboardActive = data.visible;
+                        
                         if (remoteKeyboardActive) {
                             hiddenInput.style.pointerEvents = "auto";
-                            // محاولة التركيز فوراً عند الاستلام
-                            setTimeout(() => hiddenInput.focus(), 100);
+                            // إعادة تصفير التركيز لضمان الفتح المتكرر
+                            hiddenInput.blur(); 
+                            setTimeout(() => hiddenInput.focus(), 50);
                         } else {
                             hiddenInput.style.pointerEvents = "none";
                             hiddenInput.blur();
