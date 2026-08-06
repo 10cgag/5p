@@ -1,90 +1,49 @@
-<!DOCTYPE html>
-<html lang="ar">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>تحكم عن بعد - 5P Pro</title>
-    <style>
-        body { background-color: #000; color: white; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; margin: 0; padding: 0; overflow: hidden; touch-action: none; }
-        #header { width: 100%; background: #111; padding: 8px 0; text-align: center; border-bottom: 1px solid #333; }
-        #status { font-size: 13px; color: #ffb400; }
-        #container { flex: 1; position: relative; width: 100%; display: flex; justify-content: center; align-items: center; background: #000; }
-        #remoteScreen { max-width: 100%; max-height: 100%; object-fit: contain; }
-        #controls { width: 100%; background: #111; padding: 10px; display: flex; gap: 8px; box-sizing: border-box; border-top: 1px solid #333; }
-        #textInput { flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #444; background: #222; color: white; font-size: 16px; outline: none; }
-        #sendBtn { padding: 10px 20px; border-radius: 8px; border: none; background: #00ffcc; color: #000; font-weight: bold; cursor: pointer; }
-    </style>
-</head>
-<body>
-    <div id="header"><div id="status">جاري الاتصال...</div></div>
-    <div id="container"><img id="remoteScreen" draggable="false" alt="في انتظار البث..." /></div>
-    <div id="controls"><input type="text" id="textInput" placeholder="اكتب هنا للتحكم..." autocomplete="off"><button id="sendBtn">إرسال</button></div>
+const express = require('express');
+const http = require('http');
+const WebSocket = require('ws');
+const path = require('path');
 
-    <script>
-        const statusDiv = document.getElementById('status');
-        const img = document.getElementById('remoteScreen');
-        const textInput = document.getElementById('textInput');
-        const socket = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`);
-        socket.binaryType = 'blob';
+const app = express();
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
 
-        socket.onopen = () => { statusDiv.innerText = '✅ متصل: يمكنك اللمس والكتابة الآن'; statusDiv.style.color = '#00ffcc'; };
+app.use(express.static(path.join(__dirname)));
 
-        let lastObjectUrl = null;
-        socket.onmessage = (event) => {
-            if (event.data instanceof Blob) {
-                if (lastObjectUrl) URL.revokeObjectURL(lastObjectUrl);
-                lastObjectUrl = URL.createObjectURL(event.data);
-                img.src = lastObjectUrl;
-            }
-        };
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
 
-        function handleInteraction(e) {
-            e.preventDefault();
-            const rect = img.getBoundingClientRect();
-            
-            // حساب الأبعاد الحقيقية للصورة المعروضة
-            const imgRatio = img.naturalWidth / img.naturalHeight;
-            const containerRatio = rect.width / rect.height;
-            let actualWidth, actualHeight, offsetX = 0, offsetY = 0;
+wss.on('connection', (ws) => {
+    console.log('New connection established');
+    ws.isAlive = true;
+    ws.on('pong', () => { ws.isAlive = true; });
 
-            if (containerRatio > imgRatio) {
-                actualHeight = rect.height;
-                actualWidth = actualHeight * imgRatio;
-                offsetX = (rect.width - actualWidth) / 2;
-            } else {
-                actualWidth = rect.width;
-                actualHeight = actualWidth / imgRatio;
-                offsetY = (rect.height - actualHeight) / 2;
-            }
-
-            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
-            
-            // حساب الموقع الدقيق بالنسبة للصورة فقط
-            const x = (clientX - rect.left - offsetX) / actualWidth;
-            const y = (clientY - rect.top - offsetY) / actualHeight;
-
-            if (x >= 0 && x <= 1 && y >= 0 && y <= 1) {
-                if (socket.readyState === WebSocket.OPEN) {
-                    socket.send(JSON.stringify({ type: 'touch', x: x, y: y }));
-                    const oldText = statusDiv.innerText;
-                    statusDiv.innerText = "👆 تم إرسال لمسة دقيقة...";
-                    setTimeout(() => { statusDiv.innerText = oldText; }, 400);
-                }
-            }
+    ws.on('message', (message) => {
+        // تمرير الأوامر فقط (اللمس والنص)
+        if (typeof message === 'string' || (message instanceof Buffer && message.length < 1000)) {
+            console.log('Remote Command:', message.toString());
         }
 
-        img.addEventListener('mousedown', handleInteraction);
-        img.addEventListener('touchstart', handleInteraction, { passive: false });
-        
-        document.getElementById('sendBtn').onclick = () => {
-            if (textInput.value && socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({ type: 'text', value: textInput.value }));
-                socket.send(JSON.stringify({ type: 'key', value: 'Enter' }));
-                textInput.value = '';
+        wss.clients.forEach((client) => {
+            if (client !== ws && client.readyState === WebSocket.OPEN) {
+                client.send(message);
             }
-        };
-        socket.onclose = () => statusDiv.innerText = '❌ انقطع الاتصال';
-    </script>
-</body>
-</html>
+        });
+    });
+
+    ws.on('close', () => console.log('Client disconnected'));
+});
+
+// الحفاظ على استقرار الاتصال في Render
+const interval = setInterval(() => {
+    wss.clients.forEach((ws) => {
+        if (ws.isAlive === false) return ws.terminate();
+        ws.isAlive = false;
+        ws.ping();
+    });
+}, 25000);
+
+wss.on('close', () => clearInterval(interval));
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log(`Server live on port ${PORT}`));
