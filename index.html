@@ -3,69 +3,103 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Remote Control</title>
+    <title>تحكم عن بعد - 5P Pro</title>
     <style>
         body {
-            background-color: #121212;
+            background-color: #000;
             color: white;
             font-family: sans-serif;
             display: flex;
             flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
+            height: 100vh;
             margin: 0;
-            padding: 5px;
-            box-sizing: border-box;
+            padding: 0;
             overflow: hidden;
+            touch-action: none;
+        }
+        #header {
+            width: 100%;
+            background: #111;
+            padding: 8px 0;
+            text-align: center;
+            border-bottom: 1px solid #333;
         }
         #status {
-            margin-bottom: 5px;
-            font-size: 14px;
-            font-weight: bold;
-            color: #00ffcc;
+            font-size: 13px;
+            color: #ffb400;
+        }
+        #container {
+            flex: 1;
+            position: relative;
+            width: 100%;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
         #remoteScreen {
             max-width: 100%;
-            max-height: 92vh;
-            border: 1px solid #333;
-            border-radius: 8px;
+            max-height: 100%;
             object-fit: contain;
-            cursor: pointer;
-            touch-action: none;
         }
-        /* حقل مخفي تماماً لاستدعاء الكيبورد بدون إظهار أي مربع */
-        #hiddenInput {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 1px;
-            height: 1px;
-            opacity: 0;
-            border: none;
+        #controls {
+            width: 100%;
+            background: #111;
+            padding: 10px;
+            display: flex;
+            gap: 8px;
+            box-sizing: border-box;
+            border-top: 1px solid #333;
+        }
+        #textInput {
+            flex: 1;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #444;
+            background: #222;
+            color: white;
+            font-size: 16px;
             outline: none;
         }
+        #sendBtn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            background: #00ffcc;
+            color: #000;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        #sendBtn:active { opacity: 0.7; }
     </style>
 </head>
 <body>
 
-    <div id="status">جاري الاتصال بالسيرفر...</div>
-    <img id="remoteScreen" alt="في انتظار البث..." />
+    <div id="header">
+        <div id="status">جاري الاتصال...</div>
+    </div>
 
-    <!-- حقل إدخال مخفي لتفعيل الكيبورد مباشر عند الضغط -->
-    <input type="text" id="hiddenInput" autocomplete="off" capitalize="off" spellcheck="false" />
+    <div id="container">
+        <img id="remoteScreen" draggable="false" alt="في انتظار البث..." />
+    </div>
+
+    <div id="controls">
+        <input type="text" id="textInput" placeholder="اكتب هنا للتحكم..." autocomplete="off">
+        <button id="sendBtn">إرسال</button>
+    </div>
 
     <script>
         const statusDiv = document.getElementById('status');
         const imgElement = document.getElementById('remoteScreen');
-        const hiddenInput = document.getElementById('hiddenInput');
+        const textInput = document.getElementById('textInput');
+        const sendBtn = document.getElementById('sendBtn');
 
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const socket = new WebSocket(`${protocol}//${window.location.host}`);
         socket.binaryType = 'blob';
 
         socket.onopen = () => {
-            statusDiv.innerText = 'متصل بالسيرفر بنجاح ✅';
+            statusDiv.innerText = '✅ متصل: يمكنك اللمس والكتابة الآن';
             statusDiv.style.color = '#00ffcc';
         };
 
@@ -78,49 +112,47 @@
             }
         };
 
-        // عند اللمس على الشاشة: إرسال الضغطة للموبايل + فتح الكيبورد تلقائياً
-        imgElement.addEventListener('pointerdown', (e) => {
-            const rect = imgElement.getBoundingClientRect();
-            const x = (e.clientX - rect.left) / rect.width;
-            const y = (e.clientY - rect.top) / rect.height;
-
-            if (socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({
-                    type: 'touch',
-                    x: x,
-                    y: y
-                }));
-            }
-
-            // التركيز على الحقل المخفي ليظهر كيبورد الجهاز فوراً
-            hiddenInput.focus();
-        });
-
-        // إرسال كل حرف تكتبه فوراً إلى الجهاز الآخر
-        hiddenInput.addEventListener('input', (e) => {
-            const val = e.target.value;
+        function sendText() {
+            const val = textInput.value;
             if (val && socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({
-                    type: 'text',
-                    value: val
-                }));
-                hiddenInput.value = ''; // تفريغ الحقل مباشرةً
-            }
-        });
-
-        // إرسال الأزرار الخاصة مثل Enter و Backspace
-        hiddenInput.addEventListener('keydown', (e) => {
-            if (socket.readyState !== WebSocket.OPEN) return;
-            
-            if (e.key === 'Enter') {
+                socket.send(JSON.stringify({ type: 'text', value: val }));
                 socket.send(JSON.stringify({ type: 'key', value: 'Enter' }));
-            } else if (e.key === 'Backspace' && hiddenInput.value === '') {
-                socket.send(JSON.stringify({ type: 'key', value: 'Backspace' }));
+                textInput.value = '';
             }
-        });
+            textInput.focus();
+        }
+
+        sendBtn.onclick = sendText;
+        textInput.onkeydown = (e) => { if (e.key === 'Enter') sendText(); };
+
+        function handleInteraction(e) {
+            e.preventDefault();
+            const rect = imgElement.getBoundingClientRect();
+            
+            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+            
+            if (clientX === undefined || clientY === undefined) return;
+
+            const x = (clientX - rect.left) / rect.width;
+            const y = (clientY - rect.top) / rect.height;
+
+            if (x >= 0 && x <= 1 && y >= 0 && y <= 1) {
+                if (socket.readyState === WebSocket.OPEN) {
+                    socket.send(JSON.stringify({
+                        type: 'touch',
+                        x: x,
+                        y: y
+                    }));
+                }
+            }
+        }
+
+        imgElement.addEventListener('mousedown', handleInteraction);
+        imgElement.addEventListener('touchstart', handleInteraction, { passive: false });
 
         socket.onclose = () => {
-            statusDiv.innerText = 'تم قطع الاتصال ❌';
+            statusDiv.innerText = '❌ انقطع الاتصال - يرجى التحديث';
             statusDiv.style.color = '#ff4d4d';
         };
     </script>
