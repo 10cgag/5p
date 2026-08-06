@@ -2,80 +2,65 @@
 <html lang="ar">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>تحكم عن بعد</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Screen Stream</title>
     <style>
-        body { margin: 0; background: #000; height: 100vh; display: flex; flex-direction: column; overflow: hidden; touch-action: none; }
-        #screenDisplay { width: 100vw; height: 100vh; object-fit: contain; position: absolute; z-index: 1; }
-        #hiddenInput {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            opacity: 0; z-index: 10;
-            font-size: 16px;
-            border: none; outline: none;
-            background: transparent;
+        body {
+            background-color: #121212;
+            color: white;
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        #status {
+            margin-bottom: 10px;
+            font-size: 14px;
+            color: #00ffcc;
+        }
+        img {
+            max-width: 100%;
+            max-height: 80vh;
+            border: 2px solid #333;
+            border-radius: 8px;
         }
     </style>
 </head>
 <body>
-    <input type="text" id="hiddenInput" autofocus autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="text">
-    <img id="screenDisplay" />
+
+    <div id="status">جاري الاتصال بالسيرفر...</div>
+    <img id="remoteScreen" alt="في انتظار البث..." />
+
     <script>
+        const statusDiv = document.getElementById('status');
+        const imgElement = document.getElementById('remoteScreen');
+
+        // التحديد التلقائي لبروتوكول الـ WebSocket (wss لـ Render و ws للـ Local)
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const ws = new WebSocket(`${protocol}//${window.location.host}`);
-        const img = document.getElementById('screenDisplay');
-        const hiddenInput = document.getElementById('hiddenInput');
+        const socket = new WebSocket(`${protocol}//${window.location.host}`);
 
-        const DUMMY = ".........."; 
-        hiddenInput.value = DUMMY;
-
-        ws.onopen = () => {
-            hiddenInput.focus();
-            hiddenInput.value = DUMMY;
+        socket.onopen = () => {
+            statusDiv.innerText = 'متصل بالسيرفر بنجاح ✅';
+            statusDiv.style.color = '#00ffcc';
         };
 
-        hiddenInput.addEventListener('mousedown', (e) => {
-            const rect = img.getBoundingClientRect();
-            ws.send(JSON.stringify({ type: 'touch', x: e.clientX / rect.width, y: e.clientY / rect.height }));
-        });
-
-        hiddenInput.addEventListener('touchstart', (e) => {
-            const rect = img.getBoundingClientRect();
-            const touch = e.touches[0];
-            ws.send(JSON.stringify({ type: 'touch', x: touch.clientX / rect.width, y: touch.clientY / rect.height }));
-        });
-
-        hiddenInput.onkeydown = (e) => {
-            if (e.key === 'Enter') {
-                ws.send(JSON.stringify({ type: 'key', value: 'Enter' }));
-            }
+        socket.onmessage = (event) => {
+            // استقبال الإطارات وعرضها
+            imgElement.src = event.data;
         };
 
-        hiddenInput.oninput = (e) => {
-            const val = e.target.value;
-            if (val.length < DUMMY.length) {
-                const count = DUMMY.length - val.length;
-                for (let i = 0; i < count; i++) {
-                    ws.send(JSON.stringify({ type: 'key', value: 'Backspace' }));
-                }
-            } 
-            else if (val.length > DUMMY.length) {
-                const added = val.substring(DUMMY.length);
-                if (added === " " || added === "" || val.endsWith(" ")) {
-                    ws.send(JSON.stringify({ type: 'key', value: ' ' }));
-                } else {
-                    ws.send(JSON.stringify({ type: 'text', value: added }));
-                }
-            }
-            hiddenInput.value = DUMMY;
+        socket.onclose = () => {
+            statusDiv.innerText = 'تم قطع الاتصال بالسيرفر ❌';
+            statusDiv.style.color = '#ff4d4d';
         };
 
-        ws.onmessage = (event) => {
-            if (event.data instanceof Blob) {
-                const url = URL.createObjectURL(event.data);
-                img.src = url;
-                img.onload = () => URL.revokeObjectURL(url);
-            }
+        socket.onerror = (error) => {
+            console.error('WebSocket Error:', error);
+            statusDiv.innerText = 'حدث خطأ في الاتصال!';
+            statusDiv.style.color = '#ff4d4d';
         };
     </script>
 </body>
