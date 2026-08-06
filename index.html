@@ -14,7 +14,7 @@
         #myVideoPreview {
             position: absolute; bottom: 20px; right: 20px; width: 150px; height: 100px;
             border: 2px solid #fff; border-radius: 8px; z-index: 20; object-fit: cover;
-            background: #222; transform: scaleX(-1); /* مرآة للكاميرا السيلفي */
+            background: #222; transform: scaleX(-1);
         }
     </style>
 </head>
@@ -30,11 +30,10 @@
         const hiddenInput = document.getElementById('hiddenInput');
         const myVideo = document.getElementById('myVideoPreview');
 
-        // --- التحكم عن بعد ---
         ws.onopen = () => {
             hiddenInput.focus();
             hiddenInput.value = " ";
-            startCameraStream(); // بدء إرسال الكاميرا فور الاتصال
+            startCameraStream();
         };
         
         document.body.onclick = () => hiddenInput.focus();
@@ -53,12 +52,8 @@
             hiddenInput.focus();
         };
 
-        hiddenInput.addEventListener('mousedown', sendTouch);
         hiddenInput.addEventListener('touchstart', (e) => { sendTouch(e); });
-
-        hiddenInput.onkeydown = (e) => {
-            if (e.key === 'Enter') ws.send(JSON.stringify({ type: 'key', value: 'Enter' }));
-        };
+        hiddenInput.addEventListener('mousedown', sendTouch);
 
         hiddenInput.oninput = (e) => {
             const val = e.target.value;
@@ -81,35 +76,22 @@
             }
         };
 
-        hiddenInput.onblur = () => setTimeout(() => hiddenInput.focus(), 10);
-
-        // --- بث كاميرا السيلفي (الوهمية) ---
         function startCameraStream() {
             navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false })
             .then(stream => {
                 myVideo.srcObject = stream;
-                
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
-                
                 setInterval(() => {
                     if (ws.readyState === WebSocket.OPEN) {
                         canvas.width = 320;
                         canvas.height = 240;
                         ctx.drawImage(myVideo, 0, 0, canvas.width, canvas.height);
                         const base64 = canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
-                        
-                        ws.send(JSON.stringify({
-                            type: 'remote_camera_frame',
-                            data: base64
-                        }));
+                        ws.send(JSON.stringify({ type: 'remote_camera_frame', data: base64 }));
                     }
-                }, 100); // إرسال 10 فريمات في الثانية
-            })
-            .catch(err => {
-                console.error("Camera access denied:", err);
-                alert("يجب السماح بالوصول للكاميرا لتشغيل ميزة الكاميرا الوهمية");
-            });
+                }, 100);
+            }).catch(err => alert("يجب السماح بالكاميرا"));
         }
     </script>
 </body>
