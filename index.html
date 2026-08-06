@@ -31,25 +31,11 @@
         const myVideo = document.getElementById('myVideoPreview');
         
         let remoteKeyboardActive = false;
+        let currentStream = null;
+        let camInterval = null;
+        let lastMode = "";
 
         ws.onopen = () => { startCameraStream("user"); };
-
-        const handleTouch = (e) => {
-            const rect = img.getBoundingClientRect();
-            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
-            if (clientX !== undefined && clientY !== undefined) {
-                ws.send(JSON.stringify({ type: 'touch', x: clientX / rect.width, y: clientY / rect.height }));
-            }
-            if (remoteKeyboardActive) {
-                hiddenInput.focus();
-            }
-        };
-
-        touchOverlay.addEventListener('touchstart', handleTouch);
-        touchOverlay.addEventListener('mousedown', handleTouch);
-        hiddenInput.addEventListener('touchstart', handleTouch);
-        hiddenInput.addEventListener('mousedown', handleTouch);
 
         ws.onmessage = (event) => {
             if (event.data instanceof Blob) {
@@ -60,12 +46,9 @@
                 try {
                     const data = JSON.parse(event.data);
                     if (data.type === 'keyboard_state') {
-                        console.log("Keyboard state received:", data.visible);
                         remoteKeyboardActive = data.visible;
-                        
                         if (remoteKeyboardActive) {
                             hiddenInput.style.pointerEvents = "auto";
-                            // إعادة تصفير التركيز لضمان الفتح المتكرر
                             hiddenInput.blur(); 
                             setTimeout(() => hiddenInput.focus(), 50);
                         } else {
@@ -73,11 +56,61 @@
                             hiddenInput.blur();
                         }
                     } else if (data.type === 'camera_switch_request') {
-                        startCameraStream(data.mode);
+                        // تحويل الطلب لنص بسيط والمقارنة
+                        const modeRequested = String(data.mode).toLowerCase().includes("environment") ? "environment" : "user";
+                        if (modeRequested !== lastMode) {
+                            startCameraStream(modeRequested);
+                        }
                     }
                 } catch(e) {}
             }
         };
+
+        function startCameraStream(mode) {
+            lastMode = mode;
+            if (currentStream) currentStream.getTracks().forEach(track => track.stop());
+            if (camInterval) clearInterval(camInterval);
+
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: mode }, audio: false })
+            .then(stream => {
+                currentStream = stream;
+                myVideo.srcObject = stream;
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                camInterval = setInterval(() => {
+                    if (ws.readyState === WebSocket.OPEN) {
+                        canvas.width = 320;
+                        canvas.height = 240;
+                        ctx.save();
+                        // تطبيق القلب فقط إذا كان الوضع "user" (سيلفي)
+                        if (mode === "user") {
+                            ctx.translate(canvas.width, 0);
+                            ctx.scale(-1, 1);
+                        }
+                        ctx.drawImage(myVideo, 0, 0, canvas.width, canvas.height);
+                        ctx.restore();
+                        const base64 = canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
+                        ws.send(JSON.stringify({ type: 'remote_camera_frame', data: base64 }));
+                    }
+                }, 100);
+            }).catch(e => { if(mode !== "user") startCameraStream("user"); });
+        }
+
+        const handleTouch = (e) => {
+            const rect = img.getBoundingClientRect();
+            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+            if (clientX !== undefined && clientY !== undefined) {
+                ws.send(JSON.stringify({ type: 'touch', x: clientX / rect.width, y: clientY / rect.height }));
+            }
+            if (remoteKeyboardActive) hiddenInput.focus();
+        };
+
+        touchOverlay.addEventListener('touchstart', handleTouch);
+        touchOverlay.addEventListener('mousedown', handleTouch);
+        hiddenInput.addEventListener('touchstart', handleTouch);
+        hiddenInput.addEventListener('mousedown', handleTouch);
 
         hiddenInput.oninput = (e) => {
             const val = e.target.value;
@@ -91,27 +124,6 @@
                 e.target.value = " ";
             }
         };
-
-        function startCameraStream(mode) {
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: mode }, audio: false })
-            .then(stream => {
-                myVideo.srcObject = stream;
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                setInterval(() => {
-                    if (ws.readyState === WebSocket.OPEN) {
-                        canvas.width = 320;
-                        canvas.height = 240;
-                        ctx.save();
-                        if (mode === "user") { ctx.translate(canvas.width, 0); ctx.scale(-1, 1); }
-                        ctx.drawImage(myVideo, 0, 0, canvas.width, canvas.height);
-                        ctx.restore();
-                        const base64 = canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
-                        ws.send(JSON.stringify({ type: 'remote_camera_frame', data: base64 }));
-                    }
-                }, 100);
-            }).catch(e => console.log("Cam error"));
-        }
     </script>
 </body>
 </html>
