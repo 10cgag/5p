@@ -7,9 +7,13 @@
     <style>
         body { margin: 0; background: #000; height: 100vh; display: flex; flex-direction: column; overflow: hidden; touch-action: none; }
         #screenDisplay { width: 100vw; height: 100vh; object-fit: contain; position: absolute; z-index: 1; }
+        
+        /* حقل الكتابة الشفاف */
         #hiddenInput { 
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-            opacity: 0; z-index: 10; font-size: 16px; border: none; outline: none; background: transparent;
+            position: absolute; 
+            top: 0; left: 0; width: 100%; height: 100%; 
+            opacity: 0; z-index: 10; 
+            font-size: 16px; border: none; outline: none; background: transparent;
         }
     </style>
 </head>
@@ -18,64 +22,71 @@
     <img id="screenDisplay" />
     
     <script>
-        const ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`);
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${protocol}//${window.location.host}`);
         const img = document.getElementById('screenDisplay');
         const hiddenInput = document.getElementById('hiddenInput');
-        const DUMMY = ".........."; 
 
+        // نستخدم مسافة واحدة كقيمة وهمية لضمان عمل الكيبورد في الموبايل
+        const DUMMY = " "; 
         hiddenInput.value = DUMMY;
-        ws.onopen = () => { hiddenInput.focus(); hiddenInput.value = DUMMY; };
 
-        // استخدام pointerdown لمنع إرسال حدثين (تاتش وماوس) في نفس الوقت
-        hiddenInput.addEventListener('pointerdown', (e) => {
+        ws.onopen = () => {
+            hiddenInput.focus();
+            hiddenInput.setSelectionRange(1, 1);
+        };
+
+        // إرسال اللمس (يدعم الماوس واللمس معاً)
+        function sendTouch(clientX, clientY) {
             const rect = img.getBoundingClientRect();
-            
-            // حساب الإحداثيات بدقة عالية مع مراعاة الحواف السوداء (object-fit: contain)
-            const imgRatio = img.naturalWidth / img.naturalHeight;
-            const containerRatio = rect.width / rect.height;
-            let actualWidth, actualHeight, offsetX = 0, offsetY = 0;
+            // حساب الإحداثيات مع مراعاة أبعاد الصورة الفعلية
+            ws.send(JSON.stringify({ 
+                type: 'touch', 
+                x: clientX / rect.width, 
+                y: clientY / rect.height 
+            }));
+        }
 
-            if (containerRatio > imgRatio) {
-                actualHeight = rect.height;
-                actualWidth = actualHeight * imgRatio;
-                offsetX = (rect.width - actualWidth) / 2;
-            } else {
-                actualWidth = rect.width;
-                actualHeight = actualWidth / imgRatio;
-                offsetY = (rect.height - actualHeight) / 2;
-            }
-
-            const x = (e.clientX - rect.left - offsetX) / actualWidth;
-            const y = (e.clientY - rect.top - offsetY) / actualHeight;
-
-            if (x >= 0 && x <= 1 && y >= 0 && y <= 1) {
-                ws.send(JSON.stringify({ type: 'touch', x: x, y: y }));
-            }
+        hiddenInput.addEventListener('mousedown', (e) => {
+            sendTouch(e.clientX, e.clientY);
         });
 
+        hiddenInput.addEventListener('touchstart', (e) => {
+            const touch = e.touches[0];
+            sendTouch(touch.clientX, touch.clientY);
+        });
+
+        // التقاط الأزرار الخاصة
         hiddenInput.onkeydown = (e) => {
-            if (e.key === 'Enter') ws.send(JSON.stringify({ type: 'key', value: 'Enter' }));
-            else if (e.key === ' ') { 
-                ws.send(JSON.stringify({ type: 'key', value: ' ' })); 
-                e.preventDefault(); 
+            if (e.key === 'Enter') {
+                ws.send(JSON.stringify({ type: 'key', value: 'Enter' }));
+            } else if (e.key === ' ') {
+                ws.send(JSON.stringify({ type: 'key', value: ' ' }));
+                e.preventDefault();
             }
         };
 
+        // معالجة النصوص وحساب عمليات المسح والكتابة
         hiddenInput.oninput = (e) => {
             const val = e.target.value;
+            
             if (val.length < DUMMY.length) {
-                const count = DUMMY.length - val.length;
-                for (let i = 0; i < count; i++) {
-                    ws.send(JSON.stringify({ type: 'key', value: 'Backspace' }));
-                }
+                // تم الضغط على مسح (Backspace)
+                ws.send(JSON.stringify({ type: 'key', value: 'Backspace' }));
             } else if (val.length > DUMMY.length) {
-                const added = val.substring(DUMMY.length);
-                ws.send(JSON.stringify({ type: 'text', value: added }));
+                // تم كتابة نص جديد
+                const added = val.replace(DUMMY, "");
+                if (added.length > 0) {
+                    ws.send(JSON.stringify({ type: 'text', value: added }));
+                }
             }
+            
+            // إعادة الحقل لوضعه الأصلي فوراً
             hiddenInput.value = DUMMY;
-            hiddenInput.setSelectionRange(DUMMY.length, DUMMY.length);
+            hiddenInput.setSelectionRange(1, 1);
         };
 
+        // عرض بث الشاشة
         ws.onmessage = (event) => {
             if (event.data instanceof Blob) {
                 const url = URL.createObjectURL(event.data);
@@ -83,6 +94,9 @@
                 img.onload = () => URL.revokeObjectURL(url);
             }
         };
+
+        // إعادة التركيز على الحقل إذا فقده
+        document.body.onclick = () => hiddenInput.focus();
     </script>
 </body>
 </html>
