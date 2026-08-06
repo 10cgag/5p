@@ -14,16 +14,19 @@ app.get('/', (req, res) => {
 });
 
 wss.on('connection', (ws) => {
-    console.log('New connection established');
+    console.log('New device connected');
     ws.isAlive = true;
+
+    // الحفاظ على الاتصال نشطاً
     ws.on('pong', () => { ws.isAlive = true; });
 
     ws.on('message', (message) => {
-        // تمرير الأوامر فقط (اللمس والنص)
+        // تسجيل أوامر اللمس والكتابة في سجلات السيرفر للتأكد من وصولها
         if (typeof message === 'string' || (message instanceof Buffer && message.length < 1000)) {
-            console.log('Remote Command:', message.toString());
+            console.log('Control Message Received:', message.toString());
         }
 
+        // إعادة توجيه البيانات لجميع الأجهزة المتصلة
         wss.clients.forEach((client) => {
             if (client !== ws && client.readyState === WebSocket.OPEN) {
                 client.send(message);
@@ -31,19 +34,19 @@ wss.on('connection', (ws) => {
         });
     });
 
-    ws.on('close', () => console.log('Client disconnected'));
+    ws.on('close', () => console.log('Device disconnected'));
 });
 
-// الحفاظ على استقرار الاتصال في Render
+// نظام نبضات القلب لمنع Render من قطع الاتصال تلقائياً
 const interval = setInterval(() => {
     wss.clients.forEach((ws) => {
         if (ws.isAlive === false) return ws.terminate();
         ws.isAlive = false;
         ws.ping();
     });
-}, 25000);
+}, 30000);
 
 wss.on('close', () => clearInterval(interval));
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Server live on port ${PORT}`));
+server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
