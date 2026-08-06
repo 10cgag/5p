@@ -3,27 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>تحكم عن بعد ذكي</title>
+    <title>تحكم عن بعد - دقة عالية</title>
     <style>
         body { margin: 0; background: #000; height: 100vh; display: flex; flex-direction: column; overflow: hidden; touch-action: none; }
         #screenDisplay { width: 100vw; height: 100vh; object-fit: fill; position: absolute; z-index: 1; }
-        
         #hiddenInput {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             opacity: 0.01; z-index: 20; border: none; outline: none; background: transparent;
             display: block; pointer-events: none;
         }
-        
-        #touchOverlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            z-index: 10; background: transparent;
-        }
+        #touchOverlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; background: transparent; }
         #myVideoPreview { display: none; }
     </style>
 </head>
 <body>
     <input type="text" id="hiddenInput" autocomplete="off" autocapitalize="none" spellcheck="false" value=" ">
-    
     <div id="touchOverlay"></div>
     <img id="screenDisplay" />
     <video id="myVideoPreview" autoplay muted playsinline></video>
@@ -42,14 +36,18 @@
 
         const handleTouch = (e) => {
             const rect = img.getBoundingClientRect();
-            // الحصول على الإحداثيات الحقيقية داخل عنصر الصورة فقط
             const clientX = e.clientX || (e.touches && e.touches[0].clientX);
             const clientY = e.clientY || (e.touches && e.touches[0].clientY);
             
             if (clientX !== undefined && clientY !== undefined) {
-                // حساب المكان بالنسبة لبداية الصورة (rect.left و rect.top)
+                // حساب المكان بالنسبة للصورة
                 const relativeX = (clientX - rect.left) / rect.width;
-                const relativeY = (clientY - rect.top) / rect.height;
+                let relativeY = (clientY - rect.top) / rect.height;
+
+                // --- تعديل المعايرة (رفع اللمسة قليلاً) ---
+                // سنقوم بخصم 0.02 (أي حوالي 2%) من الارتفاع لرفع الضغطة للأعلى
+                relativeY = relativeY - 0.015; 
+                if (relativeY < 0) relativeY = 0;
 
                 ws.send(JSON.stringify({
                     type: 'touch',
