@@ -7,7 +7,8 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
-// تقديم ملف index.html
+app.use(express.static(path.join(__dirname)));
+
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 wss.on('connection', (ws) => {
@@ -15,11 +16,12 @@ wss.on('connection', (ws) => {
 
     ws.on('message', (data) => {
         try {
+            // محاولة معالجة الرسائل النصية (أوامر)
             const messageString = data.toString();
             const parsed = JSON.parse(messageString);
             
-            // إعادة توجيه الأوامر وحالة الكيبورد لجميع المتصلين
-            if (['touch', 'text', 'key', 'keyboard_state'].includes(parsed.type)) {
+            // تمرير أوامر اللمس، الكيبورد، وحالة الكاميرا
+            if (['touch', 'text', 'key', 'keyboard_state', 'camera_request'].includes(parsed.type)) {
                 wss.clients.forEach((client) => {
                     if (client !== ws && client.readyState === 1) {
                         client.send(messageString);
@@ -27,7 +29,7 @@ wss.on('connection', (ws) => {
                 });
             }
         } catch (e) {
-            // إعادة توجيه بيانات البث (صور الشاشة)
+            // تمرير البيانات الثنائية (Binary) - صور الشاشة أو صور الكاميرا
             wss.clients.forEach((client) => {
                 if (client !== ws && client.readyState === 1) {
                     client.send(data);
@@ -35,6 +37,8 @@ wss.on('connection', (ws) => {
             });
         }
     });
+
+    ws.on('close', () => console.log('Device disconnected'));
 });
 
 const port = process.env.PORT || 3000;
