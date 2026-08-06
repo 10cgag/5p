@@ -7,34 +7,28 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-app.use(express.static(path.join(__dirname, '../'))); // الوصول للملفات في المجلد الرئيسي
-
+// البحث عن الملف في نفس مجلد السيرفر
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, '../index.html'));
+    res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 wss.on('connection', (ws) => {
     console.log('New connection established');
     ws.on('message', (data) => {
-        // إذا كانت البيانات نصية (JSON)
-        if (typeof data === 'string' || data instanceof Buffer) {
-            try {
-                const message = data.toString();
-                if (message.startsWith('{')) {
-                    const json = JSON.parse(message);
-                    
-                    // إعادة توجيه فريمات الكاميرا واللمس والنصوص للجميع
-                    wss.clients.forEach((client) => {
-                        if (client !== ws && client.readyState === WebSocket.OPEN) {
-                            client.send(message);
-                        }
-                    });
-                    return;
-                }
-            } catch (e) {}
+        // إذا كانت البيانات نصية (JSON) نرسلها كما هي
+        if (typeof data === 'string' || Buffer.isBuffer(data)) {
+            let messageStr = data.toString();
+            if (messageStr.startsWith('{')) {
+                wss.clients.forEach((client) => {
+                    if (client !== ws && client.readyState === WebSocket.OPEN) {
+                        client.send(messageStr);
+                    }
+                });
+                return;
+            }
         }
 
-        // توجيه البيانات الثنائية (صور الشاشة) للجميع
+        // توجيه بيانات صور الشاشة للجميع
         wss.clients.forEach((client) => {
             if (client !== ws && client.readyState === WebSocket.OPEN) {
                 client.send(data);
