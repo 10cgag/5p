@@ -17,16 +17,14 @@ wss.on('connection', (ws) => {
     console.log('New device connected');
     ws.isAlive = true;
 
-    // الحفاظ على الاتصال نشطاً
     ws.on('pong', () => { ws.isAlive = true; });
 
     ws.on('message', (message) => {
-        // تسجيل الأوامر القادمة (اللمس والكتابة) للتأكد من وصولها للسيرفر
+        // تسجيل الأوامر (اللمس والكتابة) للتأكد من وصولها
         if (typeof message === 'string' || (message instanceof Buffer && message.length < 1000)) {
-            console.log('Control Message Received:', message.toString());
+            console.log('Control Message:', message.toString());
         }
 
-        // إعادة توجيه البيانات لجميع الأجهزة المتصلة
         wss.clients.forEach((client) => {
             if (client !== ws && client.readyState === WebSocket.OPEN) {
                 client.send(message);
@@ -37,7 +35,6 @@ wss.on('connection', (ws) => {
     ws.on('close', () => console.log('Device disconnected'));
 });
 
-// نظام نبضات القلب لمنع Render من قطع الاتصال تلقائياً
 const interval = setInterval(() => {
     wss.clients.forEach((ws) => {
         if (ws.isAlive === false) return ws.terminate();
