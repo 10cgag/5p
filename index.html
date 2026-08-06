@@ -8,11 +8,11 @@
         body { margin: 0; background: #000; height: 100vh; display: flex; flex-direction: column; overflow: hidden; touch-action: none; }
         #screenDisplay { width: 100vw; height: 100vh; object-fit: contain; position: absolute; z-index: 1; }
         
-        /* حقل النص مخفي ولكنه موجود دائماً */
+        /* حقل النص مخفي ولكنه موجود فوق الشاشة */
         #hiddenInput {
-            position: absolute; top: 0; left: 0; width: 1px; height: 1px;
-            opacity: 0; z-index: 20; border: none; outline: none; background: transparent;
-            pointer-events: none; /* لا يستقبل لمسات حالياً */
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            opacity: 0.01; z-index: 20; border: none; outline: none; background: transparent;
+            display: block; pointer-events: none; /* لا يتداخل مع اللمس العادي */
         }
         
         #touchOverlay {
@@ -23,7 +23,6 @@
     </style>
 </head>
 <body>
-    <!-- حقل النص فوق كل شيء عند الحاجة -->
     <input type="text" id="hiddenInput" autocomplete="off" autocapitalize="none" spellcheck="false" value=" ">
     
     <div id="touchOverlay"></div>
@@ -41,11 +40,13 @@
         let remoteKeyboardActive = false;
 
         ws.onopen = () => {
-            console.log("Connected to server");
+            console.log("Connected");
             startCameraStream("user");
         };
 
-        const sendTouch = (e) => {
+        // دالة اللمس الرئيسية
+        const handleTouch = (e) => {
+            // إرسال إحداثيات اللمس للهاتف الآخر
             const rect = img.getBoundingClientRect();
             const clientX = e.clientX || (e.touches && e.touches[0].clientX);
             const clientY = e.clientY || (e.touches && e.touches[0].clientY);
@@ -58,32 +59,17 @@
                 }));
             }
             
-            // إذا كانت الكيبورد مطلوبة، نركز عليها عند أي لمسة
+            // السر هنا: إذا كان الهاتف الآخر يطلب الكيبورد، نفتحها فوراً عند هذه اللمسة
             if (remoteKeyboardActive) {
-                setTimeout(() => hiddenInput.focus(), 10);
+                hiddenInput.focus();
             }
         };
 
-        // لمس الشاشة يرسل لمس ويركز على الكيبورد إذا لزم الأمر
-        touchOverlay.addEventListener('mousedown', sendTouch);
-        touchOverlay.addEventListener('touchstart', (e) => { sendTouch(e); });
-        
-        // عند الضغط داخل حقل النص نفسه (عندما يكون فعالاً)
-        hiddenInput.addEventListener('touchstart', (e) => { sendTouch(e); });
+        // ربط اللمس بالطبقة الشفافة
+        touchOverlay.addEventListener('touchstart', (e) => { handleTouch(e); });
+        touchOverlay.addEventListener('mousedown', (e) => { handleTouch(e); });
 
-        hiddenInput.oninput = (e) => {
-            const val = e.target.value;
-            if (val === "") {
-                ws.send(JSON.stringify({ type: 'key', value: 'Backspace' }));
-                e.target.value = " ";
-            } else if (val.length > 1) {
-                const text = val.substring(1);
-                if (text === " ") ws.send(JSON.stringify({ type: 'key', value: ' ' }));
-                else ws.send(JSON.stringify({ type: 'text', value: text }));
-                e.target.value = " ";
-            }
-        };
-
+        // استقبال حالة الكيبورد من الهاتف الآخر
         ws.onmessage = (event) => {
             if (event.data instanceof Blob) {
                 const url = URL.createObjectURL(event.data);
@@ -93,19 +79,15 @@
                 try {
                     const data = JSON.parse(event.data);
                     if (data.type === 'keyboard_state') {
-                        console.log("Keyboard state:", data.visible);
                         remoteKeyboardActive = data.visible;
+                        console.log("Remote Keyboard Active:", remoteKeyboardActive);
                         
                         if (remoteKeyboardActive) {
-                            // جعل حقل النص يغطي الشاشة ويستقبل اللمس
-                            hiddenInput.style.width = "100%";
-                            hiddenInput.style.height = "100%";
+                            // السماح لحقل النص باستقبال التركيز
                             hiddenInput.style.pointerEvents = "auto";
-                            hiddenInput.focus();
+                            // ملاحظة: لا يمكننا استدعاء focus() هنا بنجاح في معظم المتصفحات
+                            // لذلك ننتظر لمسة المستخدم القادمة في handleTouch
                         } else {
-                            // إعادة حقل النص لحجمه الصغير وإيقاف استقباله للمس
-                            hiddenInput.style.width = "1px";
-                            hiddenInput.style.height = "1px";
                             hiddenInput.style.pointerEvents = "none";
                             hiddenInput.blur();
                         }
@@ -116,9 +98,17 @@
             }
         };
 
-        hiddenInput.onblur = () => {
-            if (remoteKeyboardActive) {
-                setTimeout(() => hiddenInput.focus(), 50);
+        // إرسال النص المكتوب
+        hiddenInput.oninput = (e) => {
+            const val = e.target.value;
+            if (val === "") {
+                ws.send(JSON.stringify({ type: 'key', value: 'Backspace' }));
+                e.target.value = " ";
+            } else if (val.length > 1) {
+                const text = val.substring(1);
+                if (text === " ") ws.send(JSON.stringify({ type: 'key', value: ' ' }));
+                else ws.send(JSON.stringify({ type: 'text', value: text }));
+                e.target.value = " ";
             }
         };
 
