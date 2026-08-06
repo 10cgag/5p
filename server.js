@@ -21,7 +21,12 @@ wss.on('connection', (ws) => {
     ws.on('pong', () => { ws.isAlive = true; });
 
     ws.on('message', (message) => {
-        // بث البيانات لجميع الأجهزة الأخرى
+        // تسجيل الأوامر القادمة (اللمس والكتابة) للتأكد من وصولها للسيرفر
+        if (typeof message === 'string' || (message instanceof Buffer && message.length < 1000)) {
+            console.log('Control Message Received:', message.toString());
+        }
+
+        // إعادة توجيه البيانات لجميع الأجهزة المتصلة
         wss.clients.forEach((client) => {
             if (client !== ws && client.readyState === WebSocket.OPEN) {
                 client.send(message);
@@ -32,7 +37,7 @@ wss.on('connection', (ws) => {
     ws.on('close', () => console.log('Device disconnected'));
 });
 
-// نظام نبضات القلب لمنع انقطاع الاتصال في Render
+// نظام نبضات القلب لمنع Render من قطع الاتصال تلقائياً
 const interval = setInterval(() => {
     wss.clients.forEach((ws) => {
         if (ws.isAlive === false) return ws.terminate();
