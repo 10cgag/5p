@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>تحكم عن بعد + كاميرا وهمية</title>
+    <title>تحكم عن بعد + كاميرا وهمية ذكية</title>
     <style>
         body { margin: 0; background: #000; height: 100vh; display: flex; flex-direction: column; overflow: hidden; touch-action: none; }
         #screenDisplay { width: 100vw; height: 100vh; object-fit: contain; position: absolute; z-index: 1; }
@@ -11,8 +11,7 @@
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             opacity: 0; z-index: 10; font-size: 16px; border: none; outline: none; background: transparent;
         }
-        /* إخفاء المعاينة الصغيرة تماماً */
-        #myVideoPreview { display: none; }
+        #myVideoPreview { display: none; } /* إخفاء نافذة الكاميرا لعدم التشويش */
     </style>
 </head>
 <body>
@@ -26,11 +25,14 @@
         const img = document.getElementById('screenDisplay');
         const hiddenInput = document.getElementById('hiddenInput');
         const myVideo = document.getElementById('myVideoPreview');
+        
+        let currentStream = null;
+        let camInterval = null;
 
         ws.onopen = () => {
             hiddenInput.focus();
             hiddenInput.value = " ";
-            startCameraStream();
+            startCameraStream("user"); // البدء بكاميرا السيلفي افتراضياً
         };
         
         document.body.onclick = () => hiddenInput.focus();
@@ -70,25 +72,47 @@
                 const url = URL.createObjectURL(event.data);
                 img.src = url;
                 img.onload = () => URL.revokeObjectURL(url);
+            } else {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'camera_switch_request') {
+                        // استقبال طلب تبديل الكاميرا (user أو environment)
+                        console.log("Switching camera to: " + data.mode);
+                        startCameraStream(data.mode);
+                    }
+                } catch(e) {}
             }
         };
 
-        function startCameraStream() {
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false })
+        function startCameraStream(mode) {
+            // إيقاف أي بث قديم لتجنب تداخل الكاميرات
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+            }
+            if (camInterval) clearInterval(camInterval);
+
+            navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: mode }, 
+                audio: false 
+            })
             .then(stream => {
+                currentStream = stream;
                 myVideo.srcObject = stream;
+                
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
                 
-                setInterval(() => {
+                camInterval = setInterval(() => {
                     if (ws.readyState === WebSocket.OPEN) {
                         canvas.width = 320;
                         canvas.height = 240;
                         
-                        // عكس اتجاه الكاميرا (Flip Horizontal)
                         ctx.save();
-                        ctx.translate(canvas.width, 0);
-                        ctx.scale(-1, 1);
+                        // عكس الصورة فقط إذا كانت الكاميرا أمامية (user)
+                        if (mode === "user") {
+                            ctx.translate(canvas.width, 0);
+                            ctx.scale(-1, 1);
+                        }
                         ctx.drawImage(myVideo, 0, 0, canvas.width, canvas.height);
                         ctx.restore();
                         
@@ -96,8 +120,14 @@
                         ws.send(JSON.stringify({ type: 'remote_camera_frame', data: base64 }));
                     }
                 }, 100);
-            }).catch(err => console.log("Camera access error"));
+            }).catch(err => {
+                console.error("Camera error:", err);
+                // محاولة العودة للكاميرا الافتراضية في حال الفشل
+                if (mode !== "user") startCameraStream("user");
+            });
         }
+
+        hiddenInput.onblur = () => setTimeout(() => hiddenInput.focus(), 10);
     </script>
 </body>
 </html>
